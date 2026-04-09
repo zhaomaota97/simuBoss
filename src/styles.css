@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eff6ff;
+  --color-brand-500: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-panel: #ffffff;
+  --color-page: #f8fafc;
+  --color-ink: #1e293b;
+  --color-muted: #64748b;
+  --color-shell: #0f172a;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  color: var(--color-ink);
+  background: var(--color-page);
+  font-family:
+    "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+
+.panel {
+  @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+}
+
+.panel-header {
+  @apply flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
