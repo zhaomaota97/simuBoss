@@ -87,7 +87,15 @@
               <div class="text-sm font-semibold text-slate-800">{{ ui.canvasTitle }}</div>
               <div class="mt-1 text-xs text-slate-500">{{ ui.canvasHint }}</div>
             </div>
-            <div class="text-xs text-slate-500">{{ ui.zoom }} {{ Math.round(view.scale * 100) }}%</div>
+            <div class="flex items-center gap-2">
+              <button
+                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600"
+                @click="fitViewportToContent"
+              >
+                {{ ui.focusContent }}
+              </button>
+              <div class="text-xs text-slate-500">{{ ui.zoom }} {{ Math.round(view.scale * 100) }}%</div>
+            </div>
           </div>
 
           <div
@@ -99,17 +107,22 @@
             @wheel.prevent="handleWheel"
           >
             <div class="absolute inset-0" :style="worldStyle">
-              <div class="relative h-[1200px] w-[1800px] bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1.2px,transparent_0)] bg-[length:24px_24px] bg-white">
-                <PlacementNode
-                  v-for="placement in draftAssignments"
-                  :key="placement.id"
-                  :placement="placement"
-                  mode="edit"
-                  absolute
-                  @remove="removePlacement"
-                  @drop-into="dropIntoNode"
-                  @start-move="startRootMove"
-                />
+              <div
+                class="relative bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1.2px,transparent_0)] bg-[length:24px_24px] bg-white"
+                :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
+              >
+                <div class="absolute inset-0" :style="canvasOffsetStyle">
+                  <PlacementNode
+                    v-for="placement in draftAssignments"
+                    :key="placement.id"
+                    :placement="placement"
+                    mode="edit"
+                    absolute
+                    @remove="removePlacement"
+                    @drop-into="dropIntoNode"
+                    @start-move="startRootMove"
+                  />
+                </div>
 
                 <div
                   v-if="!draftAssignments.length"
@@ -148,7 +161,10 @@
                   draggable="true"
                   @dragstart="startPaletteDrag(item)"
                 >
-                  <div class="truncate text-sm font-semibold text-slate-800">{{ item.icon }} {{ item.name }}</div>
+                  <div class="flex items-center gap-2 truncate text-sm font-semibold text-slate-800">
+                    <AvatarBadge :icon="item.icon" :label="item.name" :size="28" rounded="xl" text-class="text-xs font-semibold" />
+                    <span class="truncate">{{ item.name }}</span>
+                  </div>
                   <div class="mt-1 text-xs text-slate-500">{{ item.meta }}</div>
                 </div>
               </div>
@@ -171,7 +187,10 @@
                   draggable="true"
                   @dragstart="startPaletteDrag(item)"
                 >
-                  <div class="truncate text-sm font-semibold text-slate-800">{{ item.icon }} {{ item.name }}</div>
+                  <div class="flex items-center gap-2 truncate text-sm font-semibold text-slate-800">
+                    <AvatarBadge :icon="item.icon" :label="item.name" :size="28" rounded="xl" text-class="text-xs font-semibold" />
+                    <span class="truncate">{{ item.name }}</span>
+                  </div>
                   <div class="mt-1 text-xs text-slate-500">{{ item.meta }}</div>
                 </div>
               </div>
@@ -193,7 +212,10 @@
                   draggable="true"
                   @dragstart="startPaletteDrag(item)"
                 >
-                  <div class="truncate text-sm font-semibold text-slate-800">{{ item.icon }} {{ item.name }}</div>
+                  <div class="flex items-center gap-2 truncate text-sm font-semibold text-slate-800">
+                    <AvatarBadge :icon="item.icon" :label="item.name" :size="28" rounded="xl" text-class="text-xs font-semibold" />
+                    <span class="truncate">{{ item.name }}</span>
+                  </div>
                   <div class="mt-1 text-xs text-slate-500">{{ item.meta }}</div>
                 </div>
               </div>
@@ -206,14 +228,22 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import AvatarBadge from '../components/common/AvatarBadge.vue'
 import PlacementNode from '../components/canvas/PlacementNode.vue'
+import {
+  getPlacementBounds,
+  getPlacementDesignHeight,
+  getPlacementDesignWidth,
+} from '../utils/placementBounds'
 import { cloneDeep, resolveNode } from '../utils/tree'
 import { useSimuBossStore } from '../stores/simuBoss'
 
 const GRID = 24
-const WORLD_W = 1800
-const WORLD_H = 1200
+const WORLD_W = 12000
+const WORLD_H = 12000
+const WORLD_ORIGIN_X = WORLD_W / 2
+const WORLD_ORIGIN_Y = WORLD_H / 2
 
 const ui = {
   title: '\u697c\u5c42\u5e03\u7f6e',
@@ -230,6 +260,7 @@ const ui = {
   saved: '\u5df2\u4e0e\u9996\u9875\u540c\u6b65',
   canvasTitle: '\u753b\u5e03',
   canvasHint: '\u7a7a\u767d\u533a\u53ef\u5e73\u79fb\uff0c\u6eda\u8f6e\u53ea\u505a\u5c0f\u5e45\u7f29\u653e\u3002',
+  focusContent: '\u5b9a\u4f4d\u5230\u5185\u5bb9',
   zoom: '\u7f29\u653e',
   empty: '\u8fd8\u6ca1\u6709\u4efb\u4f55\u5e03\u7f6e',
   emptyHint: '\u628a\u53f3\u4fa7\u7684\u56e2\u961f\u3001\u7ecf\u7406\u6216\u5458\u5de5\u62d6\u8fdb\u6765\u5c31\u884c\u3002',
@@ -281,6 +312,17 @@ const draftAssignments = computed({
 const isDirty = computed(
   () => JSON.stringify(draftAssignments.value) !== JSON.stringify(savedAssignments.value),
 )
+const contentBounds = computed(() =>
+  getPlacementBounds(draftAssignments.value, {
+    padding: 96,
+  }),
+)
+const canvasWidth = computed(() => WORLD_W)
+const canvasHeight = computed(() => WORLD_H)
+const canvasOffsetStyle = computed(() => ({
+  transform: `translate(${WORLD_ORIGIN_X}px, ${WORLD_ORIGIN_Y}px)`,
+  transformOrigin: '0 0',
+}))
 const worldStyle = computed(() => ({
   transform: `translate(${view.value.x}px, ${view.value.y}px) scale(${view.value.scale})`,
   transformOrigin: '0 0',
@@ -407,31 +449,21 @@ function buildPlacementFromPalette(item, point = null) {
 }
 
 function snap(value) {
-  return Math.max(0, Math.round(value / GRID) * GRID)
+  return Math.round(value / GRID) * GRID
 }
 
 function rootWidth(item) {
-  return item.kind === 'team' ? 304 : item.kind === 'manager' ? 260 : 188
+  return getPlacementDesignWidth(item)
 }
 
 function estimateRootHeight(item) {
-  const childCount = item.children?.length || 0
-  if (item.kind === 'team') {
-    const rows = childCount ? Math.ceil(childCount / 3) : 0
-    return 176 + rows * 116
-  }
-  if (item.kind === 'manager') {
-    const rows = childCount ? Math.ceil(childCount / 2) : 0
-    return 132 + rows * 104
-  }
-  return 88
+  return getPlacementDesignHeight(item)
 }
 
 function clampRoot(x, y, item) {
-  const width = rootWidth(item)
   return {
-    x: snap(Math.min(WORLD_W - width, Math.max(0, x))),
-    y: snap(Math.min(WORLD_H - 140, Math.max(0, y))),
+    x: snap(x),
+    y: snap(y),
   }
 }
 
@@ -439,8 +471,10 @@ function pointFromEvent(clientX, clientY) {
   const rect = viewportRef.value?.getBoundingClientRect()
   if (!rect) return { x: 0, y: 0 }
   const width = dragPalette.value ? rootWidth(dragPalette.value) : 188
-  const x = (clientX - rect.left - view.value.x) / view.value.scale - width / 2
-  const y = (clientY - rect.top - view.value.y) / view.value.scale - 44
+  const x =
+    (clientX - rect.left - view.value.x) / view.value.scale - WORLD_ORIGIN_X - width / 2
+  const y =
+    (clientY - rect.top - view.value.y) / view.value.scale - WORLD_ORIGIN_Y - 44
   return clampRoot(x, y, dragPalette.value || { kind: 'employee' })
 }
 
@@ -557,7 +591,7 @@ function autoArrangeFloor() {
   const horizontalGap = 32
   const verticalGap = 32
   const sectionGap = 56
-  const maxContentWidth = WORLD_W - outerPadding * 2
+  const maxContentWidth = 1600
   const groups = [
     { kind: 'team', items: draftAssignments.value.filter((item) => item.kind === 'team') },
     { kind: 'manager', items: draftAssignments.value.filter((item) => item.kind === 'manager') },
@@ -667,7 +701,7 @@ function handleWheel(event) {
   const rect = viewportRef.value?.getBoundingClientRect()
   if (!rect) return
   const oldScale = view.value.scale
-  const fitScale = Math.min(rect.width / 1800, rect.height / 1200)
+  const fitScale = Math.min(rect.width / canvasWidth.value, rect.height / canvasHeight.value)
   const minScale = Math.min(1, Math.max(0.6, fitScale))
   const nextScale = Math.min(1.12, Math.max(minScale, oldScale * (event.deltaY > 0 ? 0.98 : 1.02)))
   const px = event.clientX - rect.left
@@ -685,8 +719,8 @@ function handleWheel(event) {
 function clampViewport() {
   const rect = viewportRef.value?.getBoundingClientRect()
   if (!rect) return
-  const scaledWidth = 1800 * view.value.scale
-  const scaledHeight = 1200 * view.value.scale
+  const scaledWidth = canvasWidth.value * view.value.scale
+  const scaledHeight = canvasHeight.value * view.value.scale
   const minX = scaledWidth <= rect.width ? (rect.width - scaledWidth) / 2 : rect.width - scaledWidth
   const maxX = scaledWidth <= rect.width ? minX : 0
   const minY = scaledHeight <= rect.height ? (rect.height - scaledHeight) / 2 : rect.height - scaledHeight
@@ -698,9 +732,33 @@ function clampViewport() {
   }
 }
 
+function fitViewportToContent() {
+  const rect = viewportRef.value?.getBoundingClientRect()
+  if (!rect) return
+  const fitScale = Math.min(rect.width / contentBounds.value.width, rect.height / contentBounds.value.height, 1)
+  const nextScale = Math.max(0.42, fitScale)
+  view.value = {
+    scale: nextScale,
+    x: rect.width / 2 - (contentBounds.value.minX + contentBounds.value.maxX) / 2 * nextScale - WORLD_ORIGIN_X * nextScale,
+    y: rect.height / 2 - (contentBounds.value.minY + contentBounds.value.maxY) / 2 * nextScale - WORLD_ORIGIN_Y * nextScale,
+  }
+  clampViewport()
+}
+
 onBeforeUnmount(() => {
   document.body.style.userSelect = ''
   window.removeEventListener('mousemove', movePan)
   window.removeEventListener('mousemove', moveRoot)
+  window.removeEventListener('resize', fitViewportToContent)
+})
+
+onMounted(() => {
+  window.addEventListener('resize', fitViewportToContent)
+  nextTick(() => fitViewportToContent())
+})
+
+watch(selectedFloorId, async () => {
+  await nextTick()
+  fitViewportToContent()
 })
 </script>

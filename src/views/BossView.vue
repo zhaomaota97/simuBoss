@@ -28,7 +28,7 @@
           v-for="approval in runtime.approvals"
           :key="approval.id"
           class="mb-3 w-full rounded-xl border border-amber-200 border-l-4 border-l-amber-400 bg-white p-3 text-left shadow-sm"
-          @click="selectedApproval = approval"
+          @click="openApproval(approval)"
         >
           <div class="text-sm font-semibold text-slate-800">{{ approval.task }}</div>
           <div class="mt-1 text-xs text-slate-500">{{ ui.approver }}{{ approval.managerName }}</div>
@@ -70,7 +70,6 @@
           {{ ui.zoom }} {{ Math.round(view.scale * 100) }}%
         </div>
       </div>
-
       <div class="min-h-0 flex-1 overflow-hidden bg-[#f8fafc] p-4">
         <div
           v-if="!currentPlacements.length"
@@ -241,7 +240,7 @@
               {{ ui.approver }}{{ selectedApproval.managerName }}
             </div>
           </div>
-          <button class="text-xl text-slate-400" @click="selectedApproval = null">x</button>
+          <button class="text-xl text-slate-400" @click="closeApprovalModal">x</button>
         </div>
         <div class="scrollbar-thin flex-1 overflow-y-auto bg-slate-50 p-5">
           <div class="rounded-2xl border border-slate-200 bg-white p-4">
@@ -267,47 +266,201 @@
                   </div>
                 </div>
               </div>
-              <div class="rounded-xl bg-slate-50 p-4">
-                <div class="text-xs font-semibold tracking-[0.18em] text-slate-400">目标理解</div>
-                <div class="mt-2 text-sm leading-6 text-slate-700">{{ selectedApproval.plan.summary }}</div>
-              </div>
-              <div class="rounded-xl bg-slate-50 p-4">
-                <div class="text-xs font-semibold tracking-[0.18em] text-slate-400">最终交付</div>
-                <div class="mt-2 text-sm leading-6 text-slate-700">{{ selectedApproval.plan.deliverable }}</div>
-              </div>
-              <div class="rounded-xl border border-slate-200">
-                <div class="border-b border-slate-200 px-4 py-3 text-xs font-semibold tracking-[0.18em] text-slate-400">
-                  任务分配
-                </div>
-                <div class="divide-y divide-slate-100">
-                  <div
-                    v-for="(item, index) in selectedApproval.plan.tasks"
-                    :key="item.id || index"
-                    class="px-4 py-4"
-                  >
-                    <div class="flex items-start justify-between gap-4">
-                      <div>
-                        <div class="text-sm font-semibold text-slate-900">
-                          {{ index + 1 }}. {{ item.title }}
+              <template v-if="approvalEditMode">
+                <div class="space-y-4">
+                  <div class="grid gap-4 xl:grid-cols-2">
+                    <div class="rounded-xl bg-slate-50 p-4">
+                      <div class="text-xs font-semibold tracking-[0.18em] text-slate-400">目标理解</div>
+                      <textarea
+                        v-model="selectedApproval.plan.summary"
+                        rows="5"
+                        class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-700 outline-none focus:border-brand-500"
+                      />
+                    </div>
+                    <div class="rounded-xl bg-slate-50 p-4">
+                      <div class="text-xs font-semibold tracking-[0.18em] text-slate-400">最终交付</div>
+                      <textarea
+                        v-model="selectedApproval.plan.deliverable"
+                        rows="5"
+                        class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-700 outline-none focus:border-brand-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-between rounded-xl border border-dashed border-brand-300 bg-brand-50 px-4 py-3">
+                    <div class="text-sm text-brand-700">在右侧详细编辑每个子任务，支持折叠查看。</div>
+                    <button
+                      class="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-brand-600 transition hover:bg-brand-100"
+                      @click="addApprovalTask(selectedApproval)"
+                    >
+                      + 新增子任务
+                    </button>
+                  </div>
+
+                  <div class="flex min-h-[48vh] flex-col rounded-xl border border-slate-200 bg-white">
+                    <div class="border-b border-slate-200 px-4 py-3 text-xs font-semibold tracking-[0.18em] text-slate-400">
+                      具体计划
+                    </div>
+                    <div class="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+                      <div
+                        v-for="(item, index) in selectedApproval.plan.tasks"
+                        :key="item.id || index"
+                        class="rounded-2xl border border-slate-200 bg-slate-50"
+                      >
+                        <div class="flex items-center gap-3 px-4 py-3">
+                          <button
+                            class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-500"
+                            @click="toggleApprovalTaskCollapse(selectedApproval, item, index)"
+                          >
+                            {{ isApprovalTaskCollapsed(selectedApproval, item, index) ? '展开' : '收起' }}
+                          </button>
+                          <div class="min-w-0 flex-1">
+                            <div class="truncate text-sm font-semibold text-slate-900">
+                              {{ index + 1 }}. {{ item.title || '未命名子任务' }}
+                            </div>
+                            <div class="mt-1 flex flex-wrap gap-2">
+                              <span class="rounded-full bg-white px-2.5 py-1 text-[11px] text-slate-600">
+                                {{ item.assigneeName || item.assigneeId || '未分配' }}
+                              </span>
+                              <span class="rounded-full bg-white px-2.5 py-1 text-[11px] text-slate-600">
+                                {{ normalizeDependencyList(item.dependsOn).length ? `依赖 ${normalizeDependencyList(item.dependsOn).length} 项` : '无依赖' }}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            class="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-500 transition hover:bg-rose-50"
+                            @click="removeApprovalTask(selectedApproval, index)"
+                          >
+                            删除
+                          </button>
                         </div>
-                        <div class="mt-1 text-xs text-slate-500">
-                          分配给 {{ item.assigneeName || item.assigneeId }}
+
+                        <div v-if="!isApprovalTaskCollapsed(selectedApproval, item, index)" class="border-t border-slate-200 bg-white px-4 py-4">
+                          <label class="text-xs font-semibold tracking-[0.18em] text-slate-400">任务标题</label>
+                          <input
+                            v-model="item.title"
+                            class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-brand-500"
+                          />
+
+                          <div class="mt-4 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+                            <div class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                              <div>
+                                <label class="text-xs font-semibold tracking-[0.18em] text-slate-400">分配给谁</label>
+                                <select
+                                  v-model="item.assigneeId"
+                                  class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-brand-500"
+                                  @change="syncApprovalAssignee(selectedApproval, item)"
+                                >
+                                  <option
+                                    v-for="child in getApprovalAssignableChildren(selectedApproval)"
+                                    :key="child.id"
+                                    :value="child.id"
+                                  >
+                                    {{ displayName(child) }} · {{ kindLabelForPlacement(child) }}
+                                  </option>
+                                </select>
+                              </div>
+                              <div class="rounded-xl border border-slate-200 bg-white p-3">
+                                <div class="text-[11px] font-semibold tracking-[0.18em] text-slate-400">任务时序</div>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                  <span
+                                    v-if="!normalizeDependencyList(item.dependsOn).length"
+                                    class="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700"
+                                  >
+                                    可直接开始
+                                  </span>
+                                  <span
+                                    v-for="depLabel in getApprovalDependencyLabels(selectedApproval.plan, item)"
+                                    :key="depLabel"
+                                    class="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700"
+                                  >
+                                    依赖 {{ depLabel }}
+                                  </span>
+                                </div>
+                                <div class="mt-3 border-t border-slate-200 pt-3">
+                                  <div class="text-[11px] font-semibold tracking-[0.18em] text-slate-400">编辑依赖</div>
+                                  <div class="mt-2 flex flex-wrap gap-2">
+                                    <label
+                                      v-for="candidate in getApprovalDependencyCandidates(selectedApproval.plan, item)"
+                                      :key="candidate.id"
+                                      class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        :checked="normalizeDependencyList(item.dependsOn).includes(candidate.id)"
+                                        @change="toggleApprovalDependency(item, candidate.id)"
+                                      />
+                                      <span>{{ candidate.id }} · {{ candidate.title }}</span>
+                                    </label>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                              <label class="text-xs font-semibold tracking-[0.18em] text-slate-400">具体内容</label>
+                              <textarea
+                                v-model="item.task"
+                                rows="12"
+                                class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700 outline-none focus:border-brand-500"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
-                        {{ normalizeDependencyList(item.dependsOn).length ? `依赖 ${normalizeDependencyList(item.dependsOn).length} 项` : '无依赖' }}
-                      </div>
-                    </div>
-                    <div class="mt-3 text-sm leading-6 text-slate-700">{{ item.task }}</div>
-                    <div class="mt-3 text-xs text-slate-500">
-                      分配理由：{{ item.reason || '未说明' }}
-                    </div>
-                    <div class="mt-1 text-xs text-slate-500">
-                      依赖任务：{{ normalizeDependencyList(item.dependsOn).length ? normalizeDependencyList(item.dependsOn).join('、') : '无' }}
                     </div>
                   </div>
                 </div>
-              </div>
+              </template>
+              <template v-else>
+                <div class="grid gap-4 md:grid-cols-2">
+                  <div class="rounded-xl bg-slate-50 p-4">
+                    <div class="text-xs font-semibold tracking-[0.18em] text-slate-400">目标理解</div>
+                    <div class="mt-2 text-sm leading-6 text-slate-700">
+                      {{ selectedApproval.plan.summary }}
+                    </div>
+                  </div>
+                  <div class="rounded-xl bg-slate-50 p-4">
+                    <div class="text-xs font-semibold tracking-[0.18em] text-slate-400">最终交付</div>
+                    <div class="mt-2 text-sm leading-6 text-slate-700">
+                      {{ selectedApproval.plan.deliverable }}
+                    </div>
+                  </div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white">
+                  <div class="border-b border-slate-200 px-4 py-3 text-xs font-semibold tracking-[0.18em] text-slate-400">
+                    任务时序与分配
+                  </div>
+                  <div class="divide-y divide-slate-100">
+                    <div
+                      v-for="(item, index) in selectedApproval.plan.tasks"
+                      :key="item.id || index"
+                      class="px-4 py-4"
+                    >
+                      <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900">
+                        <span>{{ index + 1 }}. {{ item.title }}</span>
+                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                          {{ item.assigneeName || item.assigneeId }}
+                        </span>
+                      </div>
+                      <div class="mt-3 flex flex-wrap gap-2">
+                        <span
+                          v-if="!normalizeDependencyList(item.dependsOn).length"
+                          class="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700"
+                        >
+                          可直接开始
+                        </span>
+                        <span
+                          v-for="depLabel in getApprovalDependencyLabels(selectedApproval.plan, item)"
+                          :key="depLabel"
+                          class="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700"
+                        >
+                          依赖 {{ depLabel }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
               <div class="grid gap-4 md:grid-cols-2">
                 <div class="rounded-xl bg-slate-50 p-4">
                   <div class="text-xs font-semibold tracking-[0.18em] text-slate-400">风险</div>
@@ -329,20 +482,19 @@
               >{{ selectedApproval.draft || ui.noDraft }}</pre
             >
           </div>
-          <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="mb-2 text-sm font-semibold text-slate-700">{{ ui.feedbackLabel }}</div>
-            <textarea
-              v-model="selectedApproval.feedback"
-              rows="4"
-              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-brand-500"
-              :placeholder="ui.feedbackPlaceholder"
-            />
-          </div>
         </div>
         <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-4">
           <button
+            v-if="selectedApproval.plan"
+            class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+            @click="approvalEditMode = !approvalEditMode"
+          >
+            {{ approvalEditMode ? '完成编辑' : '编辑计划' }}
+          </button>
+          <button
+            v-if="!approvalEditMode"
             class="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-500"
-            @click="rejectApproval(selectedApproval)"
+            @click="openRejectModal(selectedApproval)"
           >
             {{ ui.reject }}
           </button>
@@ -357,18 +509,61 @@
     </div>
 
     <div
+      v-if="rejectModalOpen && selectedApproval"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 p-4"
+    >
+      <div class="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div class="text-lg font-semibold text-slate-900">填写驳回意见</div>
+          <button class="text-xl text-slate-400" @click="closeRejectModal">x</button>
+        </div>
+        <div class="p-5">
+          <div class="mb-2 text-sm font-semibold text-slate-700">{{ ui.feedbackLabel }}</div>
+          <textarea
+            v-model="rejectFeedback"
+            rows="6"
+            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-brand-500"
+            :placeholder="ui.feedbackPlaceholder"
+          />
+        </div>
+        <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
+          <button class="rounded-xl border border-slate-200 px-4 py-2 text-sm" @click="closeRejectModal">
+            取消
+          </button>
+          <button
+            class="rounded-xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white"
+            @click="submitReject(selectedApproval)"
+          >
+            确认驳回
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
       v-if="selectedDelivery"
       class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
     >
-      <div class="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
+      <div class="flex h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div class="text-lg font-semibold text-slate-900">{{ selectedDelivery.task }}</div>
+          <div>
+            <div class="text-lg font-semibold text-slate-900">{{ selectedDelivery.task }}</div>
+            <div class="mt-1 text-xs text-slate-500">处理方：{{ selectedDelivery.sender }}</div>
+          </div>
           <button class="text-xl text-slate-400" @click="selectedDelivery = null">x</button>
         </div>
-        <pre
-          class="scrollbar-thin max-h-[65vh] overflow-auto whitespace-pre-wrap bg-slate-50 p-5 text-sm text-slate-700"
-          >{{ selectedDelivery.result }}</pre
-        >
+        <div class="scrollbar-thin flex-1 overflow-y-auto bg-slate-50 p-5">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5">
+            <div class="mb-4 flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div class="text-sm font-semibold text-slate-700">交付预览</div>
+              <div class="text-xs text-slate-400">Markdown Render</div>
+            </div>
+            <div
+              class="prose prose-sm max-w-none prose-headings:mb-3 prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700 prose-pre:hidden"
+              v-html="renderMarkdown(selectedDelivery.result)"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -449,6 +644,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PlacementNode from '../components/canvas/PlacementNode.vue'
 import { DEFAULT_SYSTEM_PROMPTS } from '../config/prompts'
+import { runPlanScheduler } from '../runtime/scheduler'
+import { useAssetLibraryStore } from '../stores/assetLibrary'
+import { getPlacementBounds } from '../utils/placementBounds'
 import { findRootManagerNode, flattenWorkerNodes, resolveNode } from '../utils/tree'
 import { useRuntimeStore } from '../stores/runtime'
 import { useSimuBossStore } from '../stores/simuBoss'
@@ -496,10 +694,12 @@ const DEFAULT_WORKER_PROMPT = DEFAULT_SYSTEM_PROMPTS.worker
 
 const store = useSimuBossStore()
 const runtime = useRuntimeStore()
+const assetLibrary = useAssetLibraryStore()
 const currentFloorId = ref(store.floors[0]?.id || 'floor-1')
 const viewportRef = ref(null)
 const panState = ref(null)
 const view = ref({ x: 32, y: 24, scale: 1 })
+const viewportSize = ref({ width: 720, height: 520 })
 const leftSidebarCollapsed = ref(false)
 const rightSidebarCollapsed = ref(false)
 const logsCollapsed = ref(true)
@@ -510,6 +710,10 @@ const longTaskInput = ref('')
 const selectedApproval = ref(null)
 const selectedDelivery = ref(null)
 const selectedEntity = ref(null)
+const approvalEditMode = ref(false)
+const approvalTaskCollapse = ref({})
+const rejectModalOpen = ref(false)
+const rejectFeedback = ref('')
 const processingSet = new Set()
 
 const taskCards = ref([
@@ -563,7 +767,20 @@ const selectedEntityTimeline = computed(() => {
       String(entry.workerKey || '').startsWith(`${sourceId}:`),
   )
 })
-const contentBounds = computed(() => getContentBounds(currentPlacements.value))
+const contentBounds = computed(() => {
+  if (!currentPlacements.value.length) {
+    return getPlacementBounds([], {
+      minWidth: viewportSize.value.width,
+      minHeight: viewportSize.value.height,
+    })
+  }
+
+  return getPlacementBounds(currentPlacements.value, {
+    minWidth: viewportSize.value.width,
+    minHeight: viewportSize.value.height,
+    padding: 72,
+  })
+})
 const canvasWidth = computed(() => Math.max(720, Math.ceil(contentBounds.value.width)))
 const canvasHeight = computed(() => Math.max(520, Math.ceil(contentBounds.value.height)))
 const canvasOffsetStyle = computed(() => ({
@@ -715,105 +932,6 @@ function createTaskCard(title) {
   return { id: crypto.randomUUID(), title }
 }
 
-function estimateRootWidth(placement) {
-  return placement.kind === 'team' ? 560 : placement.kind === 'manager' ? 320 : 188
-}
-
-function estimateManagerCardHeight(children = []) {
-  if (!children.length) return 132
-  const childGap = 12
-  const childSectionPadding = 86
-  const childrenHeight =
-    children.reduce((sum, child) => sum + estimatePlacementHeight(child), 0) +
-    childGap * Math.max(0, children.length - 1)
-  return 132 + childSectionPadding + childrenHeight
-}
-
-function estimateHierarchyBranchHeight(node) {
-  if (!node) return 84
-  const baseHeight = 84
-  const children = node.children || []
-  if (!children.length) return baseHeight
-
-  const columns = 2
-  const rowGap = 16
-  const connectorHeight = 32
-  let rowsHeight = 0
-
-  for (let index = 0; index < children.length; index += columns) {
-    const row = children.slice(index, index + columns)
-    rowsHeight += Math.max(...row.map((child) => estimateHierarchyBranchHeight(child)))
-  }
-
-  const rowCount = Math.ceil(children.length / columns)
-  return baseHeight + connectorHeight + rowsHeight + rowGap * Math.max(0, rowCount - 1)
-}
-
-function estimateTeamCardHeight(placement) {
-  const roots = getTeamHierarchyRoots(placement)
-  if (!roots.length) return 176
-  const rootGap = 20
-  const treePadding = 92
-  const treeHeight =
-    roots.reduce((sum, root) => sum + estimateHierarchyBranchHeight(root), 0) +
-    rootGap * Math.max(0, roots.length - 1)
-  return 176 + treePadding + treeHeight
-}
-
-function estimatePlacementHeight(placement) {
-  if (!placement) return 88
-  if (placement.kind === 'employee') return 88
-  if (placement.kind === 'manager') return estimateManagerCardHeight(placement.children || [])
-  if (placement.kind === 'team') return estimateTeamCardHeight(placement)
-  return 88
-}
-
-function getContentBounds(placements) {
-  if (!placements?.length) {
-    return {
-      minX: 0,
-      minY: 0,
-      maxX: 720,
-      maxY: 520,
-      width: 720,
-      height: 520,
-      offsetX: 64,
-      offsetY: 64,
-    }
-  }
-
-  const outerPadding = 96
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-
-  placements.forEach((placement) => {
-    const x = Number(placement.x || 0)
-    const y = Number(placement.y || 0)
-    const width = estimateRootWidth(placement)
-    const height = estimatePlacementHeight(placement)
-    minX = Math.min(minX, x)
-    minY = Math.min(minY, y)
-    maxX = Math.max(maxX, x + width)
-    maxY = Math.max(maxY, y + height)
-  })
-
-  const width = maxX - minX + outerPadding * 2
-  const height = maxY - minY + outerPadding * 2
-
-  return {
-    minX,
-    minY,
-    maxX,
-    maxY,
-    width,
-    height,
-    offsetX: outerPadding - minX,
-    offsetY: outerPadding - minY,
-  }
-}
-
 function addQuickTask() {
   const title = newTaskInput.value.trim()
   if (!title) return
@@ -840,6 +958,17 @@ function removeTaskCard(taskId) {
 function restoreTaskCard(taskCard) {
   if (!taskCard?.id || taskCards.value.some((item) => item.id === taskCard.id)) return
   taskCards.value.unshift(taskCard)
+}
+
+function recordDelivery({ sender, task, result, sourceTaskId = '', sourcePlanId = '' }) {
+  runtime.addDelivery({ sender, task, result })
+  assetLibrary.registerDeliverable({
+    title: task,
+    result,
+    sender,
+    sourceTaskId,
+    sourcePlanId,
+  })
 }
 
 function isExecutionError(text) {
@@ -928,7 +1057,7 @@ async function processQueue(placement) {
 }
 
 async function rejectApproval(approval) {
-  selectedApproval.value = null
+  closeApprovalModal()
   runtime.resolveApproval(approval.id)
   setPlacementStatus(approval.nodeSnapshot, 'blocked', '\u5f85\u91cd\u65b0\u89c4\u5212')
   await generateApprovalDraft(
@@ -938,8 +1067,21 @@ async function rejectApproval(approval) {
   )
 }
 
+async function submitReject(approval) {
+  approval.feedback = rejectFeedback.value.trim()
+  await rejectApproval(approval)
+}
+
 async function approveApproval(approval) {
-  selectedApproval.value = null
+  const children = getManagedChildren(approval.nodeSnapshot)
+  const validationError = validateApprovalPlan(approval.plan, children)
+  if (validationError) {
+    window.alert(`审批内容仍不合法：${validationError}`)
+    return
+  }
+
+  approval.draft = renderApprovalPlan(approval.plan)
+  closeApprovalModal()
   runtime.resolveApproval(approval.id)
   await executeTask(approval.nodeSnapshot, approval.task, approval.draft, {
     queued: true,
@@ -947,6 +1089,104 @@ async function approveApproval(approval) {
     sourceTask: approval.sourceTask,
     approvedPlan: approval.plan || null,
   })
+}
+
+function openApproval(approval) {
+  selectedApproval.value = approval
+  approvalEditMode.value = false
+}
+
+function closeApprovalModal() {
+  selectedApproval.value = null
+  approvalEditMode.value = false
+  approvalTaskCollapse.value = {}
+  closeRejectModal()
+}
+
+function openRejectModal(approval) {
+  selectedApproval.value = approval
+  rejectFeedback.value = approval?.feedback || ''
+  rejectModalOpen.value = true
+}
+
+function closeRejectModal() {
+  rejectModalOpen.value = false
+  rejectFeedback.value = ''
+}
+
+function getApprovalTaskCollapseKey(approval, item, index) {
+  return `${approval?.id || 'approval'}:${item?.id || index}`
+}
+
+function isApprovalTaskCollapsed(approval, item, index) {
+  return approvalTaskCollapse.value[getApprovalTaskCollapseKey(approval, item, index)] === true
+}
+
+function toggleApprovalTaskCollapse(approval, item, index) {
+  const key = getApprovalTaskCollapseKey(approval, item, index)
+  approvalTaskCollapse.value = {
+    ...approvalTaskCollapse.value,
+    [key]: !approvalTaskCollapse.value[key],
+  }
+}
+
+function getApprovalAssignableChildren(approval) {
+  return approval?.nodeSnapshot ? getManagedChildren(approval.nodeSnapshot) : []
+}
+
+function syncApprovalAssignee(approval, taskItem) {
+  const matched = getApprovalAssignableChildren(approval).find((child) => child.id === taskItem.assigneeId)
+  if (!matched) return
+  taskItem.assigneeName = displayName(matched)
+}
+
+function nextApprovalTaskId(plan) {
+  const used = new Set((plan?.tasks || []).map((item) => String(item.id || '').trim()))
+  let index = 1
+  while (used.has(`t${index}`)) index += 1
+  return `t${index}`
+}
+
+function addApprovalTask(approval) {
+  if (!approval?.plan?.tasks) return
+  const children = getApprovalAssignableChildren(approval)
+  const firstChild = children[0]
+  approval.plan.tasks.push({
+    id: nextApprovalTaskId(approval.plan),
+    title: '新增子任务',
+    assigneeId: firstChild?.id || '',
+    assigneeName: firstChild ? displayName(firstChild) : '',
+    task: '',
+    dependsOn: [],
+    reason: '',
+  })
+}
+
+function removeApprovalTask(approval, index) {
+  if (!approval?.plan?.tasks?.length) return
+  const removed = approval.plan.tasks[index]
+  const collapseKey = getApprovalTaskCollapseKey(approval, removed, index)
+  if (collapseKey in approvalTaskCollapse.value) {
+    const nextState = { ...approvalTaskCollapse.value }
+    delete nextState[collapseKey]
+    approvalTaskCollapse.value = nextState
+  }
+  approval.plan.tasks.splice(index, 1)
+  if (!removed?.id) return
+  approval.plan.tasks.forEach((item) => {
+    item.dependsOn = normalizeDependencyList(item.dependsOn).filter((depId) => depId !== removed.id)
+  })
+}
+
+function getApprovalDependencyCandidates(plan, task) {
+  return (plan?.tasks || []).filter((item) => item.id && item.id !== task?.id)
+}
+
+function toggleApprovalDependency(task, depId) {
+  const current = new Set(normalizeDependencyList(task?.dependsOn))
+  if (current.has(depId)) current.delete(depId)
+  else current.add(depId)
+  task.dependsOn = [...current]
 }
 
 async function generateApprovalDraft(placement, task, feedback = '') {
@@ -1221,6 +1461,65 @@ function renderApprovalPlan(plan) {
   ].join('\n')
 }
 
+function escapeHtml(text) {
+  return String(text || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+function renderMarkdown(markdown) {
+  const lines = String(markdown || '').replace(/\r/g, '').split('\n')
+  const html = []
+  let inList = false
+
+  function closeList() {
+    if (inList) {
+      html.push('</ul>')
+      inList = false
+    }
+  }
+
+  function inline(text) {
+    return escapeHtml(text)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+  }
+
+  for (const line of lines) {
+    if (!line.trim()) {
+      closeList()
+      continue
+    }
+    if (line.startsWith('## ')) {
+      closeList()
+      html.push(`<h2>${inline(line.slice(3))}</h2>`)
+      continue
+    }
+    if (line.startsWith('- ')) {
+      if (!inList) {
+        html.push('<ul>')
+        inList = true
+      }
+      html.push(`<li>${inline(line.slice(2))}</li>`)
+      continue
+    }
+    closeList()
+    html.push(`<p>${inline(line)}</p>`)
+  }
+
+  closeList()
+  return html.join('')
+}
+
+function getApprovalDependencyLabels(plan, task) {
+  const taskMap = new Map((plan?.tasks || []).map((item) => [String(item.id || ''), item]))
+  return normalizeDependencyList(task?.dependsOn).map((depId) => {
+    const matched = taskMap.get(depId)
+    return matched?.title ? `${depId} · ${matched.title}` : depId
+  })
+}
+
 async function createDelegationPlan(placement, task, approvedDraft, children, approvedPlan = null) {
   const context = getPlacementContext(placement)
   if (approvedPlan?.tasks?.length) {
@@ -1300,13 +1599,13 @@ async function executeManagedTask(placement, task, approvedDraft = '', options =
   const children = getManagedChildren(placement)
 
   if (!children.length) {
-    runtime.log('mgr', `[${context.workerName}] \u6ca1\u6709\u53ef\u6267\u884c\u7684\u4e0b\u5c5e\uff0c\u8df3\u8fc7\u7edf\u7b79`, {
+    runtime.log('mgr', `[${context.workerName}] ?????????????`, {
       entityId: placement.id,
     })
     return ''
   }
 
-  runtime.log('mgr', `[${context.workerName}] \u5f00\u59cb\u7ed9 ${children.length} \u4e2a\u76f4\u5c5e\u4e0b\u5c5e\u6d3e\u5de5`, {
+  runtime.log('mgr', `[${context.workerName}] ??? ${children.length} ???????`, {
     entityId: placement.id,
   })
   const assignments = await createDelegationPlan(
@@ -1316,54 +1615,92 @@ async function executeManagedTask(placement, task, approvedDraft = '', options =
     children,
     options.approvedPlan || null,
   )
-  const childResults = []
-  const completedTaskResults = new Map()
   const assignmentPairs = assignments
     .map((assignment) => ({
       assignment,
       child: children.find((item) => item.id === assignment.assigneeId),
     }))
     .filter((item) => item.child)
+  const scheduledAssignments = assignmentPairs.map(({ assignment, child }) => ({
+    ...assignment,
+    taskId: String(assignment?.taskId || assignment?.id || ''),
+    assigneeName: displayName(child),
+    assigneeKind: kindLabelForPlacement(child),
+    child,
+  }))
 
-  for (const { assignment, child } of assignmentPairs) {
-    const dependencyTaskIds = normalizeDependencyList(assignment?.dependsOn)
-    const dependencySummaries = dependencyTaskIds
-      .map((dep) => completedTaskResults.get(dep))
-      .filter(Boolean)
-    const dependencyNames = dependencySummaries.map((item) => item.assignee)
-    const taskInstruction =
-      assignment?.task ||
-      `${task}\n\u8bf7\u4ece ${displayName(child)} \u7684\u89d2\u8272\u89c6\u89d2\u63a8\u8fdb\u4f60\u8d1f\u8d23\u7684\u90e8\u5206\u3002`
-    const enrichedTask = dependencyNames.length
-      ? `${taskInstruction}\n\n前置依赖交付：\n${dependencySummaries
-          .map(
-            (item, index) =>
-              `${index + 1}. ${item.assignee} / ${item.title}\n交付内容：${item.result}`,
-          )
-          .join('\n\n')}\n\n请基于以上前置交付继续当前任务。`
-      : taskInstruction
+  const scheduleResult = await runPlanScheduler({
+    assignments: scheduledAssignments,
+    isExecutionError,
+    onLog(stage, item) {
+      if (stage === 'start') {
+        runtime.log(
+          'sch',
+          `[${context.workerName}] -> [${item.assigneeName || item.assigneeId}] ${item.title || item.task}`,
+          { entityId: placement.id },
+        )
+        return
+      }
+      if (stage === 'done') {
+        runtime.log(
+          'sch',
+          `[${context.workerName}] ??? [${item.assigneeName || item.assigneeId}] ???`,
+          { entityId: placement.id },
+        )
+        return
+      }
+      if (stage === 'failed') {
+        runtime.log(
+          'sch',
+          `[${context.workerName}] ????????? -> ${item.title || item.task}`,
+          { entityId: placement.id },
+        )
+        return
+      }
+      runtime.log(
+        'sch',
+        `[${context.workerName}] ???? -> ${item.title || item.task} (${item.error || '?????'})`,
+        { entityId: placement.id },
+      )
+    },
+    async executeAssignment(item, dependencyResults) {
+      const taskInstruction =
+        item?.task ||
+        `${task}
+?? ${item.assigneeName} ??????????????`
+      const enrichedTask = dependencyResults.length
+        ? `${taskInstruction}
 
-    runtime.log('sch', `[${context.workerName}] -> [${displayName(child)}] ${taskInstruction}`, {
-      entityId: placement.id,
-    })
-    const result = await executeTask(child, enrichedTask, '', {
-      queued: false,
-      deliverToBoss: false,
-    })
-    const childResult = {
-      taskId: assignment?.taskId || '',
-      title: assignment?.title || taskInstruction,
-      assignee: displayName(child),
-      kind: kindLabelForPlacement(child),
-      task: taskInstruction,
-      dependsOn: dependencyNames,
-      result,
-    }
-    childResults.push(childResult)
-    if (childResult.taskId) completedTaskResults.set(childResult.taskId, childResult)
-  }
+???????
+${dependencyResults
+            .map(
+              (dep, index) =>
+                `${index + 1}. ${dep.assigneeName || dep.assigneeId} / ${dep.title || dep.task}
+?????${dep.result || ''}`,
+            )
+            .join('\n\n')}
 
-  runtime.log('mgr', `[${context.workerName}] \u5f00\u59cb\u7edf\u7b79\u4e0b\u5c5e\u4ea4\u4ed8`, {
+????????????????`
+        : taskInstruction
+
+      return executeTask(item.child, enrichedTask, '', {
+        queued: false,
+        deliverToBoss: false,
+      })
+    },
+  })
+
+  const childResults = scheduleResult.taskResults.map((item) => ({
+    taskId: item.taskId,
+    title: item.title,
+    assignee: item.assignee,
+    kind: item.kind,
+    task: item.task,
+    dependsOn: item.dependsOn,
+    result: item.result,
+  }))
+
+  runtime.log('mgr', `[${context.workerName}] ????????`, {
     entityId: placement.id,
   })
   const finalResult = await runtime.runWorkerTask({
@@ -1371,25 +1708,37 @@ async function executeManagedTask(placement, task, approvedDraft = '', options =
     workerName: `${context.workerName} / synthesis`,
     systemPrompt: context.synthesizerPrompt,
     entityId: placement.id,
-    userPrompt: `\u8bf7\u628a\u4e0b\u5c5e\u4ea4\u4ed8\u6574\u7406\u6210\u4e00\u4efd\u9762\u5411 Boss \u7684\u6700\u7ec8\u4ea4\u4ed8\u3002
-\u603b\u4efb\u52a1\uff1a${task}
-${approvedDraft ? `\u5df2\u901a\u8fc7\u7684\u62c6\u89e3\u8349\u6848\uff1a\n${approvedDraft}\n` : ''}\n\u4e0b\u5c5e\u4ea4\u4ed8\uff1a
+    userPrompt: `????????????? Boss ??????
+????${task}
+${approvedDraft ? `?????????
+${approvedDraft}
+` : ''}
+?????
 ${childResults
-  .map(
-    (item, index) =>
-      `${index + 1}. ${item.assignee} (${item.kind})\n\u5b50\u4efb\u52a1\uff1a${item.task}\n\u4f9d\u8d56\uff1a${item.dependsOn.length ? item.dependsOn.join('、') : '无'}\n\u4ea4\u4ed8\uff1a${item.result}`,
-  )
-  .join('\n\n')}
+      .map(
+        (item, index) =>
+          `${index + 1}. ${item.assignee} (${item.kind})
+????${item.task}
+???${item.dependsOn.length ? item.dependsOn.join('?') : '?'}
+???${item.result}`,
+      )
+      .join('\n\n')}
 
-\u8bf7\u8f93\u51fa\uff1a
-1. \u6267\u884c\u6982\u89c8
-2. \u5173\u952e\u7ed3\u679c
-3. \u98ce\u9669/\u672a\u5b8c\u6210\u9879
-4. \u5efa\u8bae Boss \u540e\u7eed\u51b3\u7b56`,
+????
+1. ????
+2. ????
+3. ??/????
+4. ?? Boss ????`,
   })
 
   if (options.deliverToBoss !== false) {
-    runtime.addDelivery({ sender: context.workerName, task, result: finalResult })
+    recordDelivery({ sender: context.workerName, task, result: finalResult })
+  }
+
+  if (scheduleResult.hasFailures || scheduleResult.hasBlocked) {
+    return `????: ??????????
+
+${finalResult}`
   }
 
   return finalResult
@@ -1418,7 +1767,7 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
         : `\u5f53\u524d\u5de5\u4f5c\u9879\u76ee\uff1a${task}`,
     })
     if (deliverToBoss) {
-      runtime.addDelivery({ sender: context.workerName, task, result })
+      recordDelivery({ sender: context.workerName, task, result })
     }
   }
 
@@ -1538,7 +1887,17 @@ function formatLogTime(value) {
   })
 }
 
+function updateViewportSize() {
+  const rect = viewportRef.value?.getBoundingClientRect()
+  if (!rect) return
+  viewportSize.value = {
+    width: Math.max(320, Math.round(rect.width)),
+    height: Math.max(240, Math.round(rect.height)),
+  }
+}
+
 function fitViewportToContent() {
+  updateViewportSize()
   const rect = viewportRef.value?.getBoundingClientRect()
   if (!rect) return
   const fitScale = Math.min(rect.width / canvasWidth.value, rect.height / canvasHeight.value, 1)
@@ -1553,14 +1912,17 @@ function fitViewportToContent() {
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', movePan)
+  window.removeEventListener('resize', fitViewportToContent)
 })
 
 onMounted(() => {
+  updateViewportSize()
+  window.addEventListener('resize', fitViewportToContent)
   nextTick(() => fitViewportToContent())
 })
 
 watch(
-  currentPlacements,
+  [currentPlacements, leftSidebarCollapsed, rightSidebarCollapsed, logsCollapsed],
   async () => {
     await nextTick()
     fitViewportToContent()

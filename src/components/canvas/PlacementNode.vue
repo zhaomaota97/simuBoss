@@ -10,11 +10,13 @@
   >
     <div class="p-3" :class="headerClickableClass" data-card-header="true" @click="handleClick">
       <div class="flex items-start gap-3">
-        <div
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-bold text-slate-600"
-        >
-          {{ displayIcon }}
-        </div>
+        <AvatarBadge
+          :icon="displayIcon"
+          :label="displayName"
+          :size="40"
+          rounded="2xl"
+          text-class="text-xs font-bold"
+        />
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <span class="h-2.5 w-2.5 rounded-full" :class="statusDotClass" />
@@ -88,6 +90,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import AvatarBadge from '../common/AvatarBadge.vue'
 import HierarchyBranch from './HierarchyBranch.vue'
 import { resolveNode } from '../../utils/tree'
 import { useRuntimeStore } from '../../stores/runtime'

@@ -10,11 +10,13 @@
     >
       <div class="p-3">
         <div class="flex items-start gap-3">
-          <div
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-[11px] font-bold text-slate-600"
-          >
-            {{ displayIcon }}
-          </div>
+        <AvatarBadge
+          :icon="displayIcon"
+          :label="displayName"
+          :size="36"
+          rounded="2xl"
+          text-class="text-[11px] font-bold"
+        />
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <span class="h-2 w-2 rounded-full" :class="statusDotClass" />
@@ -68,6 +70,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import AvatarBadge from '../common/AvatarBadge.vue'
 import { useRuntimeStore } from '../../stores/runtime'
 import { useSimuBossStore } from '../../stores/simuBoss'
 

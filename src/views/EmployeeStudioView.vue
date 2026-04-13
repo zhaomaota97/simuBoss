@@ -12,7 +12,7 @@
         <div v-for="team in store.teams" :key="team.id" class="mb-4 rounded-xl border border-slate-200 p-4">
           <div class="flex items-start justify-between gap-4">
             <div class="flex items-center gap-3">
-              <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-xl">{{ team.icon }}</div>
+              <AvatarBadge :icon="team.icon" :label="team.name" :size="44" rounded="xl" />
               <div>
                 <div class="text-sm font-semibold text-slate-800">{{ team.name }}</div>
                 <div class="mt-1 text-xs text-slate-500">{{ getTeamDesc(team.members, store.employees, store.teams) }}</div>
@@ -40,7 +40,7 @@
         <div v-for="emp in store.employees" :key="emp.id" class="mb-4 rounded-xl border border-slate-200 p-4">
           <div class="flex items-start justify-between gap-4">
             <div class="flex items-center gap-3">
-              <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-xl">{{ emp.icon }}</div>
+              <AvatarBadge :icon="emp.icon" :label="emp.name" :size="44" rounded="xl" />
               <div>
                 <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
                   <span>{{ emp.name }}</span>
@@ -69,13 +69,35 @@
     <div v-if="employeeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
       <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
         <div class="mb-5 flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-slate-900">{{ editingEmployeeId ? '编辑员工信息' : '添加新员工' }}</h2>
-          <button class="text-xl text-slate-400" @click="employeeModalOpen = false">×</button>
+          <h2 class="text-lg font-semibold text-slate-900">{{ avatarUi.modalTitle(editingEmployeeId) }}</h2>
+          <button class="text-xl text-slate-400" @click="employeeModalOpen = false">x</button>
         </div>
         <div class="grid gap-4">
           <div class="grid grid-cols-[120px_1fr] gap-3">
-            <label class="self-center text-sm font-medium text-slate-700">图标</label>
-            <input v-model="employeeForm.icon" class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+            <label class="self-start pt-2 text-sm font-medium text-slate-700">{{ avatarUi.label }}</label>
+            <div class="space-y-3">
+              <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <AvatarBadge :icon="employeeForm.icon" :label="employeeForm.name" :size="56" rounded="2xl" />
+                <div class="text-sm text-slate-500">{{ avatarUi.helper }}</div>
+              </div>
+              <div class="grid grid-cols-6 gap-2">
+                <button
+                  v-for="avatar in avatarOptions"
+                  :key="avatar.value"
+                  type="button"
+                  class="rounded-xl border p-1.5 transition"
+                  :class="employeeForm.icon === avatar.value ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'"
+                  @click="employeeForm.icon = avatar.value"
+                >
+                  <AvatarBadge :icon="avatar.value" :label="avatar.label" :size="40" rounded="xl" />
+                </button>
+              </div>
+              <input
+                v-model="employeeForm.icon"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                :placeholder="avatarUi.placeholder"
+              />
+            </div>
           </div>
           <div class="grid grid-cols-[120px_1fr] gap-3">
             <label class="self-center text-sm font-medium text-slate-700">名称</label>
@@ -238,6 +260,8 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import AvatarBadge from '../components/common/AvatarBadge.vue'
+import { AVATAR_LIBRARY } from '../config/avatarLibrary'
 import TeamTreeNode from '../components/employee/TeamTreeNode.vue'
 import { useSimuBossStore } from '../stores/simuBoss'
 import { cloneDeep, getTeamDesc, hasCircularTeamRef } from '../utils/tree'
@@ -250,6 +274,12 @@ const editingTeamId = ref(null)
 const currentTeamMembers = ref([])
 const dragging = ref(null)
 const dropHint = ref('')
+const avatarUi = {
+  modalTitle: (editingId) => (editingId ? '\u7f16\u8f91\u5458\u5de5\u4fe1\u606f' : '\u6dfb\u52a0\u65b0\u5458\u5de5'),
+  label: '\u5934\u50cf',
+  helper: '\u4ece\u5934\u50cf\u5e93\u91cc\u6311\u4e00\u4e2a\uff0c\u66f4\u50cf\u771f\u5b9e\u5458\u5de5',
+  placeholder: '\u4e5f\u53ef\u4ee5\u624b\u52a8\u8f93\u5165 emoji\u3001\u7f29\u5199\u6216\u5934\u50cf\u503c',
+}
 
 const employeeForm = reactive({
   icon: '👷',
@@ -271,6 +301,7 @@ const teamForm = reactive({
 })
 
 const availableTeamPalette = computed(() => store.teams.filter((team) => team.id !== editingTeamId.value))
+const avatarOptions = AVATAR_LIBRARY
 
 function resetEmployeeForm() {
   Object.assign(employeeForm, {

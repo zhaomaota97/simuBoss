@@ -12,7 +12,7 @@
       :style="{ backgroundColor: accentColor }"
     >
       <span class="cursor-grab opacity-70">☰</span>
-      <span>{{ resolved.icon }}</span>
+      <AvatarBadge :icon="resolved.icon" :label="resolved.name" :size="24" rounded="xl" text-class="text-xs font-semibold" />
       <span class="flex-1">{{ resolved.name }}</span>
       <span class="rounded bg-black/15 px-2 py-0.5 text-[11px]">{{ badgeText }}</span>
       <button class="text-base opacity-80 transition hover:opacity-100" @click="emit('remove', path)">
@@ -65,7 +65,7 @@
       @drop="emit('drop-before', path)"
     >
       <span class="cursor-grab text-slate-300">☰</span>
-      <span>{{ resolved.icon }}</span>
+      <AvatarBadge :icon="resolved.icon" :label="resolved.name" :size="24" rounded="xl" text-class="text-xs font-semibold" />
       <span class="font-medium">{{ resolved.name }}</span>
       <button class="ml-auto text-sm text-rose-500 transition hover:text-rose-600" @click="emit('remove', path)">
         删除
@@ -76,6 +76,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import AvatarBadge from '../common/AvatarBadge.vue'
 import { resolveNode } from '../../utils/tree'
 
 defineOptions({ name: 'TeamTreeNode' })
