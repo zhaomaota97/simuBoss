@@ -1,2 +1,7 @@
 node_modules/
 dist/
+backend/.venv/
+*.egg-info/
+__pycache__/
+*.py[cod]
+logs/

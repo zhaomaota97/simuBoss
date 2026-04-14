@@ -134,7 +134,7 @@
                 class="relative bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1.2px,transparent_0)] bg-[length:24px_24px] bg-white"
                 :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
               >
-                <div class="absolute inset-0" :style="canvasOffsetStyle">
+                <div ref="canvasContentRef" class="absolute inset-0" :style="canvasOffsetStyle">
                   <PlacementNode
                     v-for="placement in draftAssignments"
                     :key="placement.id"
@@ -299,6 +299,7 @@ const ui = {
 const store = useSimuBossStore()
 const selectedFloorId = ref(store.floors[0]?.id || 'floor-1')
 const viewportRef = ref(null)
+const canvasContentRef = ref(null)
 const dragPalette = ref(null)
 const panState = ref(null)
 const moveState = ref(null)
@@ -527,6 +528,18 @@ function estimateRootHeight(item) {
   return getPlacementDesignHeight(item)
 }
 
+function getRenderedRootMetrics() {
+  const rootElements = Array.from(canvasContentRef.value?.children || [])
+
+  return draftAssignments.value.map((item, index) => {
+    const el = rootElements[index]
+    return {
+      width: Math.max(rootWidth(item), el?.offsetWidth || 0),
+      height: Math.max(estimateRootHeight(item), el?.offsetHeight || 0),
+    }
+  })
+}
+
 function clampRoot(x, y, item) {
   return {
     x: snap(x),
@@ -656,65 +669,113 @@ function clearCurrentFloor() {
 function autoArrangeFloor() {
   if (!draftAssignments.value.length) return
 
-  const outerPadding = 72
-  const horizontalGap = 32
-  const verticalGap = 32
-  const sectionGap = 56
-  const maxContentWidth = 1600
-  const groups = [
-    { kind: 'team', items: draftAssignments.value.filter((item) => item.kind === 'team') },
-    { kind: 'manager', items: draftAssignments.value.filter((item) => item.kind === 'manager') },
-    { kind: 'employee', items: draftAssignments.value.filter((item) => item.kind === 'employee') },
-  ].filter((group) => group.items.length)
+  const horizontalGap = 40
+  const verticalGap = 40
+  const renderedMetrics = getRenderedRootMetrics()
+  const sortedItems = [...draftAssignments.value].sort((a, b) => {
+    const aIndex = draftAssignments.value.findIndex((item) => item.id === a.id)
+    const bIndex = draftAssignments.value.findIndex((item) => item.id === b.id)
+    const aWidth = renderedMetrics[aIndex]?.width || rootWidth(a)
+    const aHeight = renderedMetrics[aIndex]?.height || estimateRootHeight(a)
+    const bWidth = renderedMetrics[bIndex]?.width || rootWidth(b)
+    const bHeight = renderedMetrics[bIndex]?.height || estimateRootHeight(b)
+    const areaDiff = bWidth * bHeight - aWidth * aHeight
+    if (areaDiff) return areaDiff
+    const kindOrder = { team: 0, manager: 1, employee: 2 }
+    const kindDiff = (kindOrder[a.kind] ?? 9) - (kindOrder[b.kind] ?? 9)
+    if (kindDiff) return kindDiff
+    return (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN')
+  })
 
-  let currentY = outerPadding
-  const arranged = []
+  const metricById = Object.fromEntries(
+    draftAssignments.value.map((item, index) => [
+      item.id,
+      renderedMetrics[index] || {
+        width: rootWidth(item),
+        height: estimateRootHeight(item),
+      },
+    ]),
+  )
+  const getItemWidth = (item) => metricById[item.id]?.width || rootWidth(item)
+  const getItemHeight = (item) => metricById[item.id]?.height || estimateRootHeight(item)
 
-  groups.forEach((group, groupIndex) => {
-    const sortedItems = [...group.items].sort((a, b) => {
-      const widthDiff = rootWidth(b) - rootWidth(a)
-      if (widthDiff) return widthDiff
-      return (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN')
-    })
+  const maxItemWidth = Math.max(...sortedItems.map((item) => getItemWidth(item)))
+  const totalArea = sortedItems.reduce(
+    (sum, item) => sum + (getItemWidth(item) + horizontalGap) * (getItemHeight(item) + verticalGap),
+    0,
+  )
 
-    let row = []
-    let rowWidth = 0
+  const candidateWidths = Array.from({ length: 7 }, (_, index) =>
+    snap(
+      Math.max(
+        maxItemWidth,
+        Math.min(2200, Math.sqrt(totalArea) * (0.9 + index * 0.12)),
+      ),
+    ),
+  )
 
-    const commitRow = () => {
-      if (!row.length) return
-      const totalWidth = row.reduce((sum, item) => sum + rootWidth(item), 0)
-      const totalGap = horizontalGap * Math.max(0, row.length - 1)
-      const contentWidth = totalWidth + totalGap
-      let cursorX = snap(Math.max(outerPadding, (WORLD_W - contentWidth) / 2))
-      const rowHeight = Math.max(...row.map((item) => estimateRootHeight(item)))
-
-      row.forEach((item) => {
-        arranged.push({
-          ...item,
-          x: cursorX,
-          y: currentY,
-        })
-        cursorX = snap(cursorX + rootWidth(item) + horizontalGap)
-      })
-
-      currentY = snap(currentY + rowHeight + verticalGap)
-      row = []
-      rowWidth = 0
-    }
+  function buildRows(targetWidth) {
+    const rows = []
+    let currentRow = []
+    let currentWidth = 0
 
     sortedItems.forEach((item) => {
-      const itemWidth = rootWidth(item)
-      const nextWidth = row.length ? rowWidth + horizontalGap + itemWidth : itemWidth
-      if (row.length && nextWidth > maxContentWidth) commitRow()
-      row.push(item)
-      rowWidth = row.length === 1 ? itemWidth : rowWidth + horizontalGap + itemWidth
+      const itemWidth = getItemWidth(item)
+      const nextWidth = currentRow.length ? currentWidth + horizontalGap + itemWidth : itemWidth
+      if (currentRow.length && nextWidth > targetWidth) {
+        rows.push(currentRow)
+        currentRow = [item]
+        currentWidth = itemWidth
+        return
+      }
+      currentRow.push(item)
+      currentWidth = nextWidth
     })
 
-    commitRow()
+    if (currentRow.length) rows.push(currentRow)
+    return rows
+  }
 
-    if (groupIndex < groups.length - 1) {
-      currentY = snap(currentY + sectionGap)
+  function measureRows(rows) {
+    const rowMetrics = rows.map((row) => {
+      const width = row.reduce((sum, item) => sum + getItemWidth(item), 0) + horizontalGap * Math.max(0, row.length - 1)
+      const height = Math.max(...row.map((item) => getItemHeight(item)))
+      return { row, width, height }
+    })
+    const width = Math.max(...rowMetrics.map((item) => item.width))
+    const height = rowMetrics.reduce((sum, item) => sum + item.height, 0) + verticalGap * Math.max(0, rowMetrics.length - 1)
+    return { rowMetrics, width, height }
+  }
+
+  let bestLayout = null
+
+  candidateWidths.forEach((targetWidth) => {
+    const layout = measureRows(buildRows(targetWidth))
+    const aspect = layout.width / Math.max(layout.height, 1)
+    const aspectPenalty = Math.abs(aspect - 1.18)
+    const rowPenalty = Math.max(0, layout.rowMetrics.length - 1) * 0.08
+    const widthPenalty = layout.width / 5000
+    const score = aspectPenalty + rowPenalty + widthPenalty
+
+    if (!bestLayout || score < bestLayout.score) {
+      bestLayout = { ...layout, score }
     }
+  })
+
+  let cursorY = -bestLayout.height / 2
+  const arranged = []
+
+  bestLayout.rowMetrics.forEach(({ row, width, height }) => {
+    let cursorX = -width / 2
+    row.forEach((item) => {
+      arranged.push({
+        ...item,
+        x: cursorX,
+        y: cursorY,
+      })
+      cursorX += getItemWidth(item) + horizontalGap
+    })
+    cursorY += height + verticalGap
   })
 
   draftAssignments.value = arranged.map((item) => {

@@ -4,9 +4,9 @@
       <div class="panel-header">
         <span>员工中心</span>
       </div>
-      <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4">
-        <div class="grid gap-5 xl:grid-cols-2">
-          <section class="rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
+      <div class="min-h-0 flex-1 p-4">
+        <div class="grid h-full min-h-0 gap-5 xl:grid-cols-2">
+          <section class="flex min-h-0 flex-col rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
             <div class="mb-4 flex items-center justify-between">
               <div>
                 <div class="text-sm font-semibold text-slate-900">经理席位</div>
@@ -19,6 +19,7 @@
                 + 招募经理
               </button>
             </div>
+            <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1">
             <div
               v-if="!managers.length"
               class="rounded-xl border border-dashed border-amber-200 bg-white px-4 py-8 text-center text-sm text-slate-400"
@@ -56,9 +57,10 @@
                 </div>
               </div>
             </div>
+            </div>
           </section>
 
-          <section class="rounded-2xl border border-blue-200 bg-blue-50/40 p-4">
+          <section class="flex min-h-0 flex-col rounded-2xl border border-blue-200 bg-blue-50/40 p-4">
             <div class="mb-4 flex items-center justify-between">
               <div>
                 <div class="text-sm font-semibold text-slate-900">工人席位</div>
@@ -71,6 +73,7 @@
                 + 招募工人
               </button>
             </div>
+            <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1">
             <div
               v-if="!workers.length"
               class="rounded-xl border border-dashed border-blue-200 bg-white px-4 py-8 text-center text-sm text-slate-400"
@@ -109,6 +112,7 @@
                   </button>
                 </div>
               </div>
+            </div>
             </div>
           </section>
         </div>

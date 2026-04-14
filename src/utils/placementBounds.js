@@ -1,18 +1,56 @@
 export function getPlacementDesignWidth(item) {
-  return item?.kind === 'team' ? 304 : item?.kind === 'manager' ? 260 : 188
+  return item?.kind === 'team' ? 560 : item?.kind === 'manager' ? 320 : 188
+}
+
+function getHierarchyBranchSize(item) {
+  const children = item?.children || []
+  const baseWidth = 220
+  const baseHeight = 68
+
+  if (!children.length) {
+    return { width: baseWidth, height: baseHeight }
+  }
+
+  const childSizes = children.map((child) => getHierarchyBranchSize(child))
+  const maxPerRow = 2
+  const gapX = 12
+  const gapY = 16
+  const rows = []
+
+  for (let index = 0; index < childSizes.length; index += maxPerRow) {
+    rows.push(childSizes.slice(index, index + maxPerRow))
+  }
+
+  const childrenWidth = Math.max(
+    ...rows.map((row) => row.reduce((sum, child) => sum + child.width, 0) + gapX * Math.max(0, row.length - 1)),
+    0,
+  )
+  const childrenHeight =
+    rows.reduce((sum, row) => sum + Math.max(...row.map((child) => child.height)), 0) +
+    gapY * Math.max(0, rows.length - 1)
+
+  return {
+    width: Math.max(baseWidth, childrenWidth + 24),
+    height: baseHeight + 32 + childrenHeight,
+  }
 }
 
 export function getPlacementDesignHeight(item) {
-  const childCount = item?.children?.length || 0
+  const children = item?.children || []
+  const childCount = children.length
 
   if (item?.kind === 'team') {
-    const rows = childCount ? Math.ceil(childCount / 3) : 0
-    return 176 + rows * 116
+    if (!childCount) return 176
+    const hierarchy = children.map((child) => getHierarchyBranchSize(child))
+    const tallestBranch = Math.max(...hierarchy.map((child) => child.height), 0)
+    return 176 + tallestBranch + 32
   }
 
   if (item?.kind === 'manager') {
-    const rows = childCount ? Math.ceil(childCount / 2) : 0
-    return 132 + rows * 104
+    if (!childCount) return 132
+    const stackedChildrenHeight =
+      children.reduce((sum, child) => sum + getPlacementDesignHeight(child), 0) + 12 * Math.max(0, childCount - 1)
+    return 132 + 56 + stackedChildrenHeight
   }
 
   return 88

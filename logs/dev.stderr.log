@@ -1,0 +1,88 @@
+[2m19:52:28[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m19:52:28[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:28[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m19:52:36[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of watcher callback 
+  at <BossView onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< {} > > 
+  at <RouterView> 
+  at <App>
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m19:52:36[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of watcher callback 
+  at <BossView onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< {} > > 
+  at <RouterView> 
+  at <App>
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m19:52:36[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of watcher callback 
+  at <BossView onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< {} > > 
+  at <RouterView> 
+  at <App>
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m19:52:36[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:32[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m20:04:32[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:35[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m20:04:35[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:37[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m20:04:37[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of watcher callback 
+  at <BossView onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< {} > > 
+  at <RouterView> 
+  at <App>
+[2m20:04:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:38[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m20:04:38[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of watcher callback 
+  at <BossView onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< {} > > 
+  at <RouterView> 
+  at <App>
+[2m20:04:38[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:38[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:38[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:38[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m20:04:38[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of watcher callback 
+  at <BossView onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< {} > > 
+  at <RouterView> 
+  at <App>
+[2m20:04:38[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:38[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:04:38[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:05:21[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m20:05:21[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:05:23[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m20:05:23[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:12:37[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m[Vue warn]: Unhandled error during execution of app errorHandler
+[2m20:12:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mUnknown Error[22m: Maximum recursive updates exceeded in component <BossView>. This means you have a reactive effect that is mutating its own dependencies and thus recursively triggering itself. Possible sources include component template, render function, updated hook or watcher source function.
+[39m
+[2m20:17:39[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/views/TeamStudioPage.vue. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m20:17:39[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/views/TeamStudioPage.vue. This could be due to syntax errors or importing non-existent modules. (see errors above)
