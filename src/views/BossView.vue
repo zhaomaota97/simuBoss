@@ -55,54 +55,94 @@
       </template>
     </aside>
 
-    <section class="panel flex min-w-0 flex-1 flex-col overflow-hidden">
-      <div class="flex items-center border-b border-slate-200 bg-slate-100">
-        <button
-          v-for="floor in store.floors"
-          :key="floor.id"
-          class="border-r border-slate-200 px-4 py-2 text-sm font-semibold"
-          :class="currentFloorId === floor.id ? 'bg-white text-brand-600' : 'text-slate-500'"
-          @click="currentFloorId = floor.id"
-        >
-          {{ floor.name }}
-        </button>
-        <div class="ml-auto px-4 text-xs text-slate-500">
+    <section class="panel flex min-w-0 flex-1 flex-col overflow-visible">
+      <div class="flex items-center justify-between border-b border-slate-200 bg-slate-100 px-4 py-2">
+        <div class="text-sm font-semibold text-slate-700">
+          {{ getFloorLabel(currentFloorId) }}
+        </div>
+        <div class="text-xs text-slate-500">
           {{ ui.zoom }} {{ Math.round(view.scale * 100) }}%
         </div>
       </div>
-      <div class="min-h-0 flex-1 overflow-hidden bg-[#f8fafc] p-4">
-        <div
-          v-if="!currentPlacements.length"
-          class="flex h-full min-h-[360px] items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white text-center text-slate-400"
-        >
-          <div>
-            <div class="text-lg font-semibold">{{ ui.empty }}</div>
-            <div class="mt-2 text-sm">{{ ui.emptyHint }}</div>
-          </div>
-        </div>
+      <div class="min-h-0 flex-1 overflow-visible bg-[#f8fafc] p-4">
+        <div class="flex h-full min-h-0 gap-3 overflow-visible">
+          <aside ref="floorRailRef" class="relative z-30 flex w-[64px] shrink-0 flex-col justify-end">
+            <div class="rounded-3xl border border-slate-200 bg-white/90 px-2 py-3 shadow-sm backdrop-blur">
+              <div class="flex flex-col justify-end gap-2">
+                <button
+                  v-for="floor in floorButtons"
+                  :key="floor.id"
+                  :ref="(el) => setFloorButtonRef(floor.id, el)"
+                  class="group relative z-10 flex h-11 items-center justify-center rounded-2xl border text-sm font-semibold shadow-sm transition"
+                  :class="
+                    currentFloorId === floor.id
+                      ? 'border-brand-300 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                  "
+                  @click="selectFloor(floor.id, $event.currentTarget)"
+                >
+                  <span>{{ getFloorNumber(floor.id) }}</span>
+                  <div
+                    class="pointer-events-none absolute left-full top-1/2 z-40 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-lg group-hover:block"
+                    :class="currentFloorId === floor.id ? 'block' : ''"
+                  >
+                    {{ getFloorLabel(floor.id) }}
+                  </div>
+                </button>
+              </div>
+            </div>
+          </aside>
 
-        <div v-else class="flex h-full min-h-0 flex-col">
-          <div
-            ref="viewportRef"
-            class="relative min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white"
-            @mousedown="startPan"
-            @wheel.prevent="handleWheel"
-          >
-            <div class="absolute inset-0" :style="worldStyle">
+          <div ref="canvasShellRef" class="relative min-w-0 flex-1 overflow-visible">
+            <div
+              v-if="floorCalloutStyle"
+              class="pointer-events-none absolute left-0 z-30 h-8 w-6 -translate-x-[22px] -translate-y-1/2"
+              :style="floorCalloutStyle"
+              aria-hidden="true"
+            >
               <div
-                class="relative bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1.2px,transparent_0)] bg-[length:24px_24px] bg-white"
-                :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
+                class="absolute inset-0"
+                style="clip-path: polygon(0 50%, 100% 0, 100% 100%); background: rgb(226 232 240);"
+              ></div>
+              <div
+                class="absolute inset-y-[1px] right-0 left-[2px]"
+                style="clip-path: polygon(0 50%, 100% 0, 100% 100%); background: white;"
+              ></div>
+            </div>
+            <div
+              v-if="!currentPlacements.length"
+              class="flex h-full min-h-[360px] items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white text-center text-slate-400"
+            >
+              <div>
+                <div class="text-lg font-semibold">{{ ui.empty }}</div>
+                <div class="mt-2 text-sm">{{ ui.emptyHint }}</div>
+              </div>
+            </div>
+
+            <div v-else class="flex h-full min-h-0 flex-col">
+              <div
+                ref="viewportRef"
+                class="relative min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white"
+                @mousedown="startPan"
+                @wheel.prevent="handleWheel"
               >
-                <div class="absolute inset-0" :style="canvasOffsetStyle">
-                  <PlacementNode
-                    v-for="placement in currentPlacements"
-                    :key="placement.id"
-                    :placement="placement"
-                    mode="runtime"
-                    absolute
-                    @task-drop="dropTaskToPlacement"
-                    @select="selectedEntity = $event"
-                  />
+                <div class="absolute inset-0" :style="worldStyle">
+                  <div
+                    class="relative bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1.2px,transparent_0)] bg-[length:24px_24px] bg-white"
+                    :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
+                  >
+                    <div class="absolute inset-0" :style="canvasOffsetStyle">
+                      <PlacementNode
+                        v-for="placement in currentPlacements"
+                        :key="placement.id"
+                        :placement="placement"
+                        mode="runtime"
+                        absolute
+                        @task-drop="dropTaskToPlacement"
+                        @select="selectedEntity = $event"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -200,11 +240,9 @@
       </template>
     </aside>
 
-    <div
-      v-if="longTaskModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
-    >
-      <div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
+    <Dialog v-model:open="longTaskModalOpen">
+      <DialogContent class="max-w-3xl p-0" hide-close>
+      <div class="w-full rounded-2xl bg-white shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div class="text-lg font-semibold text-slate-900">{{ ui.longTaskTitle }}</div>
           <button class="text-xl text-slate-400" @click="closeLongTaskModal">x</button>
@@ -226,13 +264,12 @@
           </button>
         </div>
       </div>
-    </div>
+      </DialogContent>
+    </Dialog>
 
-    <div
-      v-if="selectedApproval"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
-    >
-      <div class="flex h-[80vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
+    <Dialog :open="Boolean(selectedApproval)" @update:open="(open) => !open && closeApprovalModal()">
+      <DialogContent class="h-[80vh] max-w-4xl p-0" hide-close>
+      <div class="flex h-full w-full flex-col rounded-2xl bg-white shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <div class="text-lg font-semibold text-slate-900">{{ selectedApproval.task }}</div>
@@ -506,13 +543,12 @@
           </button>
         </div>
       </div>
-    </div>
+      </DialogContent>
+    </Dialog>
 
-    <div
-      v-if="rejectModalOpen && selectedApproval"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 p-4"
-    >
-      <div class="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+    <Dialog :open="rejectModalOpen && selectedApproval" @update:open="(open) => !open && closeRejectModal()">
+      <DialogContent class="max-w-xl p-0" hide-close>
+      <div class="w-full rounded-2xl bg-white shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div class="text-lg font-semibold text-slate-900">填写驳回意见</div>
           <button class="text-xl text-slate-400" @click="closeRejectModal">x</button>
@@ -538,13 +574,12 @@
           </button>
         </div>
       </div>
-    </div>
+      </DialogContent>
+    </Dialog>
 
-    <div
-      v-if="selectedDelivery"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
-    >
-      <div class="flex h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <Dialog :open="Boolean(selectedDelivery)" @update:open="(open) => !open && (selectedDelivery = null)">
+      <DialogContent class="h-[80vh] max-w-5xl p-0" hide-close>
+      <div class="flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <div class="text-lg font-semibold text-slate-900">{{ selectedDelivery.task }}</div>
@@ -565,7 +600,8 @@
           </div>
         </div>
       </div>
-    </div>
+      </DialogContent>
+    </Dialog>
 
     <div
       v-if="selectedEntity"
@@ -643,9 +679,12 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PlacementNode from '../components/canvas/PlacementNode.vue'
+import { Dialog, DialogContent } from '../components/ui/dialog'
 import { DEFAULT_SYSTEM_PROMPTS } from '../config/prompts'
 import { runPlanScheduler } from '../runtime/scheduler'
+import { executeRuntimeTask } from '../services/backendRuntime'
 import { useAssetLibraryStore } from '../stores/assetLibrary'
+import { useAuthStore } from '../stores/auth'
 import { getPlacementBounds } from '../utils/placementBounds'
 import { findRootManagerNode, flattenWorkerNodes, resolveNode } from '../utils/tree'
 import { useRuntimeStore } from '../stores/runtime'
@@ -693,9 +732,14 @@ const DEFAULT_MANAGER_SYNTHESIZER = DEFAULT_SYSTEM_PROMPTS.managerSynthesizer
 const DEFAULT_WORKER_PROMPT = DEFAULT_SYSTEM_PROMPTS.worker
 
 const store = useSimuBossStore()
+const authStore = useAuthStore()
 const runtime = useRuntimeStore()
 const assetLibrary = useAssetLibraryStore()
 const currentFloorId = ref(store.floors[0]?.id || 'floor-1')
+const floorRailRef = ref(null)
+const canvasShellRef = ref(null)
+const floorButtonRefs = ref({})
+const floorCalloutTop = ref(null)
 const viewportRef = ref(null)
 const panState = ref(null)
 const view = ref({ x: 32, y: 24, scale: 1 })
@@ -721,6 +765,10 @@ const taskCards = ref([
 ])
 
 const currentPlacements = computed(() => store.floorAssignments[currentFloorId.value] || [])
+const floorButtons = computed(() => [...store.floors].reverse())
+const floorCalloutStyle = computed(() =>
+  floorCalloutTop.value == null ? null : { top: `${floorCalloutTop.value}px` },
+)
 const selectedEntitySourceId = computed(() => getEntityInfoSourceId(selectedEntity.value))
 const selectedEntityStatusText = computed(() => {
   if (!selectedEntity.value) return ui.idle
@@ -744,7 +792,7 @@ const selectedEntityApprovals = computed(() => {
 const selectedEntityStreamText = computed(() => {
   if (!selectedEntity.value) return '\u65e0\u5b9e\u65f6\u8f93\u51fa'
   const sourceId = selectedEntitySourceId.value
-  const streamKeys = [sourceId, `${sourceId}:dispatch`, `${sourceId}:synthesis`, selectedEntity.value.id]
+  const streamKeys = [...new Set([sourceId, `${sourceId}:dispatch`, `${sourceId}:synthesis`, selectedEntity.value.id])]
   const chunks = streamKeys
     .map((key) => {
       const content = runtime.workerStates[key]?.streamedContent
@@ -791,6 +839,55 @@ const worldStyle = computed(() => ({
   transform: `translate(${view.value.x}px, ${view.value.y}px) scale(${view.value.scale})`,
   transformOrigin: '0 0',
 }))
+
+function getFloorLabel(floorId) {
+  const index = store.floors.findIndex((item) => item.id === floorId)
+  const floor = store.floors[index]
+  if (!floor) return ''
+  return `${index + 1}层 - ${String(floor.name || '').trim()}`
+}
+
+function getFloorNumber(floorId) {
+  const index = store.floors.findIndex((item) => item.id === floorId)
+  return index === -1 ? '?' : String(index + 1)
+}
+
+function setFloorButtonRef(floorId, el) {
+  const next = { ...floorButtonRefs.value }
+  if (el) next[floorId] = el
+  else delete next[floorId]
+  floorButtonRefs.value = next
+}
+
+function setFloorCalloutPositionFromButton(buttonEl) {
+  const shellEl = canvasShellRef.value
+  if (!buttonEl || !shellEl) {
+    floorCalloutTop.value = null
+    return
+  }
+
+  const buttonRect = buttonEl.getBoundingClientRect()
+  const shellRect = shellEl.getBoundingClientRect()
+  floorCalloutTop.value = buttonRect.top - shellRect.top + buttonRect.height / 2
+}
+
+function updateFloorCalloutPosition() {
+  setFloorCalloutPositionFromButton(floorButtonRefs.value[currentFloorId.value])
+}
+
+function scheduleFloorCalloutPositionUpdate() {
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      updateFloorCalloutPosition()
+    })
+  })
+}
+
+function selectFloor(floorId, buttonEl = null) {
+  currentFloorId.value = floorId
+  if (buttonEl) setFloorCalloutPositionFromButton(buttonEl)
+  scheduleFloorCalloutPositionUpdate()
+}
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value))
@@ -844,8 +941,19 @@ function getTeamLeadPlacementId(placement) {
 
 function setPlacementStatus(placement, state, text) {
   runtime.setTeamStatus(placement.id, state, text)
+  if (placement.refId) runtime.setTeamStatus(placement.refId, state, text)
   const leadId = getTeamLeadPlacementId(placement)
   if (leadId) runtime.setTeamStatus(leadId, state, text)
+}
+
+function setWorkerBusyState(placement, isWorking, currentTask = '', streamedContent = null) {
+  const keys = [...new Set([placement.id, placement.refId].filter(Boolean))]
+  keys.forEach((key) => {
+    const workerState = runtime.ensureWorkerState(key)
+    workerState.isWorking = isWorking
+    if (currentTask) workerState.currentTask = currentTask
+    if (streamedContent !== null) workerState.streamedContent = streamedContent
+  })
 }
 
 function displayName(placement) {
@@ -977,7 +1085,7 @@ function isExecutionError(text) {
 
 function getStreamText(placement) {
   const sourceId = getEntityInfoSourceId(placement)
-  const streamKeys = [sourceId, `${sourceId}:dispatch`, `${sourceId}:synthesis`, placement.id]
+  const streamKeys = [...new Set([sourceId, `${sourceId}:dispatch`, `${sourceId}:synthesis`, placement.id])]
   const chunks = streamKeys
     .map((key) => {
       const content = runtime.workerStates[key]?.streamedContent
@@ -1022,6 +1130,8 @@ function assignTask(placement, taskCard) {
     placementId: placement.id,
     sourceTask: cloneValue(taskCard),
   })
+  setPlacementStatus(placement, 'working', '准备执行中')
+  setWorkerBusyState(placement, true, taskCard.title, '')
   removeTaskCard(taskCard.id)
   runtime.log('sys', `\u4efb\u52a1\u5df2\u4e0b\u53d1\u7ed9 [${displayName(placement)}] -> ${taskCard.title}`, {
     entityId: placement.id,
@@ -1594,182 +1704,110 @@ ${approvedDraft || '无审批草案，请基于总任务和直属下属清单给
   })
 }
 
-async function executeManagedTask(placement, task, approvedDraft = '', options = {}) {
+function buildBackendExecutionPlan(placement, task, approvedPlan) {
+  if (approvedPlan?.tasks?.length) return approvedPlan
   const context = getPlacementContext(placement)
-  const children = getManagedChildren(placement)
+  return {
+    summary: `执行任务：${task}`,
+    deliverable: `完成“${task}”的交付结果`,
+    tasks: [
+      {
+        id: 't1',
+        title: task,
+        assigneeId: String(placement.id),
+        assigneeName: context.workerName,
+        task,
+        dependsOn: [],
+        reason: '直接执行当前任务',
+      },
+    ],
+    risks: [],
+    openQuestions: [],
+  }
+}
 
-  if (!children.length) {
-    runtime.log('mgr', `[${context.workerName}] ?????????????`, {
+function appendBackendTimeline(placement, timeline = []) {
+  timeline.forEach((entry) => {
+    const role = entry.stage === 'received' ? 'sys' : entry.stage.includes('worker') ? 'wrk' : 'mgr'
+    runtime.log(role, `[${entry.actor}] ${entry.message}`, { entityId: placement.id })
+  })
+}
+
+function taskLabelForStream(stage, payload = {}) {
+  if (stage === 'synthesizer') return '汇总最终交付'
+  return payload.title || payload.taskId || '执行任务中'
+}
+
+function handleRuntimeStreamEvent(placement, eventName, payload = {}) {
+  if (eventName === 'timeline' && payload.entry) {
+    appendBackendTimeline(placement, [payload.entry])
+    return
+  }
+
+  if (eventName === 'chunk') {
+    const stage = payload.stage || 'worker'
+    if (stage === 'synthesizer') {
+      const workerState = runtime.ensureWorkerState(`${placement.id}:synthesis`)
+      workerState.streamedContent = payload.fullText || ''
+      workerState.isWorking = true
+      workerState.currentTask = taskLabelForStream(stage, payload)
+    } else {
+      setWorkerBusyState(placement, true, taskLabelForStream(stage, payload), payload.fullText || '')
+    }
+    return
+  }
+
+  if (eventName === 'worker_result' && payload.assignee_name) {
+    runtime.log('wrk', `[${payload.assignee_name}] 已产出结果 -> ${payload.title}`, {
       entityId: placement.id,
     })
-    return ''
   }
-
-  runtime.log('mgr', `[${context.workerName}] ??? ${children.length} ???????`, {
-    entityId: placement.id,
-  })
-  const assignments = await createDelegationPlan(
-    placement,
-    task,
-    approvedDraft,
-    children,
-    options.approvedPlan || null,
-  )
-  const assignmentPairs = assignments
-    .map((assignment) => ({
-      assignment,
-      child: children.find((item) => item.id === assignment.assigneeId),
-    }))
-    .filter((item) => item.child)
-  const scheduledAssignments = assignmentPairs.map(({ assignment, child }) => ({
-    ...assignment,
-    taskId: String(assignment?.taskId || assignment?.id || ''),
-    assigneeName: displayName(child),
-    assigneeKind: kindLabelForPlacement(child),
-    child,
-  }))
-
-  const scheduleResult = await runPlanScheduler({
-    assignments: scheduledAssignments,
-    isExecutionError,
-    onLog(stage, item) {
-      if (stage === 'start') {
-        runtime.log(
-          'sch',
-          `[${context.workerName}] -> [${item.assigneeName || item.assigneeId}] ${item.title || item.task}`,
-          { entityId: placement.id },
-        )
-        return
-      }
-      if (stage === 'done') {
-        runtime.log(
-          'sch',
-          `[${context.workerName}] ??? [${item.assigneeName || item.assigneeId}] ???`,
-          { entityId: placement.id },
-        )
-        return
-      }
-      if (stage === 'failed') {
-        runtime.log(
-          'sch',
-          `[${context.workerName}] ????????? -> ${item.title || item.task}`,
-          { entityId: placement.id },
-        )
-        return
-      }
-      runtime.log(
-        'sch',
-        `[${context.workerName}] ???? -> ${item.title || item.task} (${item.error || '?????'})`,
-        { entityId: placement.id },
-      )
-    },
-    async executeAssignment(item, dependencyResults) {
-      const taskInstruction =
-        item?.task ||
-        `${task}
-?? ${item.assigneeName} ??????????????`
-      const enrichedTask = dependencyResults.length
-        ? `${taskInstruction}
-
-???????
-${dependencyResults
-            .map(
-              (dep, index) =>
-                `${index + 1}. ${dep.assigneeName || dep.assigneeId} / ${dep.title || dep.task}
-?????${dep.result || ''}`,
-            )
-            .join('\n\n')}
-
-????????????????`
-        : taskInstruction
-
-      return executeTask(item.child, enrichedTask, '', {
-        queued: false,
-        deliverToBoss: false,
-      })
-    },
-  })
-
-  const childResults = scheduleResult.taskResults.map((item) => ({
-    taskId: item.taskId,
-    title: item.title,
-    assignee: item.assignee,
-    kind: item.kind,
-    task: item.task,
-    dependsOn: item.dependsOn,
-    result: item.result,
-  }))
-
-  runtime.log('mgr', `[${context.workerName}] ????????`, {
-    entityId: placement.id,
-  })
-  const finalResult = await runtime.runWorkerTask({
-    workerKey: `${placement.id}:synthesis`,
-    workerName: `${context.workerName} / synthesis`,
-    systemPrompt: context.synthesizerPrompt,
-    entityId: placement.id,
-    userPrompt: `????????????? Boss ??????
-????${task}
-${approvedDraft ? `?????????
-${approvedDraft}
-` : ''}
-?????
-${childResults
-      .map(
-        (item, index) =>
-          `${index + 1}. ${item.assignee} (${item.kind})
-????${item.task}
-???${item.dependsOn.length ? item.dependsOn.join('?') : '?'}
-???${item.result}`,
-      )
-      .join('\n\n')}
-
-????
-1. ????
-2. ????
-3. ??/????
-4. ?? Boss ????`,
-  })
-
-  if (options.deliverToBoss !== false) {
-    recordDelivery({ sender: context.workerName, task, result: finalResult })
-  }
-
-  if (scheduleResult.hasFailures || scheduleResult.hasBlocked) {
-    return `????: ??????????
-
-${finalResult}`
-  }
-
-  return finalResult
 }
 
 async function executeTask(placement, task, approvedDraft = '', options = {}) {
   const { queued = false, deliverToBoss = true, sourceTask = null, approvedPlan = null } = options
   const context = getPlacementContext(placement)
   setPlacementStatus(placement, 'working', '\u4efb\u52a1\u6267\u884c\u4e2d')
+  setWorkerBusyState(placement, true, task, '')
+  runtime.ensureWorkerState(`${placement.id}:synthesis`).streamedContent = ''
+  runtime.ensureWorkerState(`${placement.id}:synthesis`).isWorking = false
 
   let result = ''
 
-  if (context.role === 'manager') {
-    result = await executeManagedTask(placement, task, approvedDraft, {
-      deliverToBoss,
-      approvedPlan,
-    })
-  } else {
-    result = await runtime.runWorkerTask({
-      workerKey: placement.id,
-      workerName: context.workerName,
-      systemPrompt: context.workerPrompt,
-      entityId: getEntityInfoSourceId(placement),
-      userPrompt: approvedDraft
-        ? `\u6309\u5df2\u5ba1\u9605\u901a\u8fc7\u7684\u62c6\u89e3\u5f00\u59cb\u6267\u884c\u3002\n\u4efb\u52a1\uff1a${task}\n\u62c6\u89e3\u8349\u6848\uff1a\n${approvedDraft}`
-        : `\u5f53\u524d\u5de5\u4f5c\u9879\u76ee\uff1a${task}`,
-    })
-    if (deliverToBoss) {
-      recordDelivery({ sender: context.workerName, task, result })
+  try {
+    if (!authStore.authToken) {
+      throw new Error('未检测到后端登录态，请先重新登录')
     }
+
+    const executionPlan = buildBackendExecutionPlan(placement, task, approvedPlan)
+    const runtimeResult = await executeRuntimeTask({
+      token: authStore.authToken,
+      task,
+      managerId: String(placement.id),
+      managerName: context.workerName,
+      approvedPlan: executionPlan,
+      context: {
+        role: context.role,
+        approvedDraft,
+      },
+      onEvent: ({ event, payload }) => handleRuntimeStreamEvent(placement, event, payload),
+    })
+    result = runtimeResult.finalResult || ''
+
+    if (deliverToBoss) {
+      recordDelivery({
+        sender: context.workerName,
+        task,
+        result,
+        sourcePlanId: runtimeResult.plan?.id || '',
+      })
+    }
+  } catch (error) {
+    result = `执行异常: ${error instanceof Error ? error.message : String(error || '')}`
   }
+
+  setWorkerBusyState(placement, false)
+  runtime.ensureWorkerState(`${placement.id}:synthesis`).isWorking = false
 
   if (queued) {
     if (isExecutionError(result)) {
@@ -1913,12 +1951,17 @@ function fitViewportToContent() {
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', movePan)
   window.removeEventListener('resize', fitViewportToContent)
+  window.removeEventListener('resize', updateFloorCalloutPosition)
 })
 
 onMounted(() => {
   updateViewportSize()
   window.addEventListener('resize', fitViewportToContent)
-  nextTick(() => fitViewportToContent())
+  window.addEventListener('resize', updateFloorCalloutPosition)
+  nextTick(() => {
+    fitViewportToContent()
+    updateFloorCalloutPosition()
+  })
 })
 
 watch(
@@ -1926,7 +1969,16 @@ watch(
   async () => {
     await nextTick()
     fitViewportToContent()
+    updateFloorCalloutPosition()
   },
   { deep: true },
+)
+
+watch(
+  [currentFloorId, floorButtons],
+  () => {
+    scheduleFloorCalloutPositionUpdate()
+  },
+  { deep: true, flush: 'post' },
 )
 </script>

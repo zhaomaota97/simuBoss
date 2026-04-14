@@ -1,53 +1,56 @@
 # simuBoss
 
-`simuBoss` 是一个基于 Vue 3、Vite、Pinia 的多员工协作模拟器。
+`simuBoss` 现在分成两部分：
 
-当前项目已改为纯前端部署模式，直接由浏览器请求 DeepSeek API。
+- `src/`：现有 Vue 前端控制台
+- `backend/`：新的 Python + LangGraph 后端骨架
 
-## 本地开发
+## 前端
 
-1. 安装依赖
+当前前端仍然可以独立开发：
 
 ```bash
 npm install
-```
-
-2. 创建环境变量文件
-
-```bash
-cp .env.example .env
-```
-
-3. 在 `.env` 中填写前端可见的 DeepSeek 配置
-
-```env
-VITE_DEEPSEEK_API_KEY=your_deepseek_api_key
-VITE_DEEPSEEK_MODEL=deepseek-chat
-VITE_DEEPSEEK_BASE_URL=https://api.deepseek.com
-```
-
-4. 启动开发环境
-
-```bash
 npm run dev
 ```
 
 默认地址：
 
-- `http://localhost:5173`
+- `http://127.0.0.1:5173`
 
-## 构建产物
+## 后端
 
-生成生产构建：
+后端目录在 `backend/`，目前已经提供：
+
+- FastAPI 服务入口
+- 固定账号登录接口
+- 健康检查接口
+- LangGraph runtime 骨架
+- 任务执行 API
+
+启动方式：
 
 ```bash
-npm run build
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e .
+uvicorn app.main:app --reload --port 8000
 ```
 
-构建完成后，静态文件位于 `dist/`。
+可参考：
 
-## 注意事项
+- [backend/README.md](C:/Users/40902/Desktop/simuBoss/backend/README.md)
+- [backend/.env.example](C:/Users/40902/Desktop/simuBoss/backend/.env.example)
 
-- `VITE_*` 环境变量会被打进前端产物，任何访问页面的人都能看到 API Key。
-- 这个仓库当前没有后端代理层，也不会替你隐藏密钥。
-- 如果 DeepSeek 对浏览器直连请求做了 CORS 限制，部署后可能仍需要重新加一个代理层。
+## 迁移方向
+
+接下来可以逐步把这些能力从前端迁到后端：
+
+- 登录鉴权
+- LLM 调用
+- 调度器
+- 资产库
+- 知识库与工具调用
+
+这样前端会逐步收敛成控制台，后端则变成真正的 Agent Runtime。

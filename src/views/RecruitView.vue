@@ -19,8 +19,11 @@
                 + 招募经理
               </button>
             </div>
-            <div v-if="!managers.length" class="rounded-xl border border-dashed border-amber-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
-              还没有经理，先招募一个负责人吧。
+            <div
+              v-if="!managers.length"
+              class="rounded-xl border border-dashed border-amber-200 bg-white px-4 py-8 text-center text-sm text-slate-400"
+            >
+              还没有经理，先招募一位负责人吧。
             </div>
             <div
               v-for="emp in managers"
@@ -68,8 +71,11 @@
                 + 招募工人
               </button>
             </div>
-            <div v-if="!workers.length" class="rounded-xl border border-dashed border-blue-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
-              还没有工人，先招募几个执行角色吧。
+            <div
+              v-if="!workers.length"
+              class="rounded-xl border border-dashed border-blue-200 bg-white px-4 py-8 text-center text-sm text-slate-400"
+            >
+              还没有工人，先招募几位执行角色吧。
             </div>
             <div
               v-for="emp in workers"
@@ -115,13 +121,13 @@
       </div>
       <div class="scrollbar-thin flex-1 overflow-y-auto p-4">
         <div class="mb-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
-          这里先作为招募推荐位使用。感兴趣的话，点任意卡片直接进入“招募员工”页面查看。
+          这里先作为招募推荐位使用。感兴趣的话，点任意卡片直接进入“人才市场”查看。
         </div>
         <div class="space-y-3">
           <RouterLink
             v-for="candidate in marketEmployees"
             :key="candidate.name"
-            class="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-300 hover:-translate-y-0.5"
+            class="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300"
             to="/market"
           >
             <div class="flex items-start gap-3">
@@ -150,111 +156,171 @@
       </div>
     </aside>
 
-    <div v-if="employeeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
-      <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-        <div class="mb-5 flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-slate-900">{{ avatarUi.modalTitle(editingEmployeeId) }}</h2>
-          <button class="text-xl text-slate-400" @click="employeeModalOpen = false">x</button>
-        </div>
-        <div class="grid gap-4">
-          <div class="grid grid-cols-[120px_1fr] gap-3">
-            <label class="self-start pt-2 text-sm font-medium text-slate-700">{{ avatarUi.label }}</label>
-            <div class="space-y-3">
-              <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                <AvatarBadge :icon="employeeForm.icon" :label="employeeForm.name" :size="56" rounded="2xl" />
-                <div class="text-sm text-slate-500">{{ avatarUi.helper }}</div>
+    <Dialog v-model:open="employeeModalOpen">
+      <DialogContent class="max-h-[88vh] max-w-2xl p-0">
+        <DialogHeader class="border-b border-slate-200 px-6 py-5">
+          <DialogTitle>{{ avatarUi.modalTitle(editingEmployeeId) }}</DialogTitle>
+          <DialogDescription>为员工配置头像、职责和模型参数。</DialogDescription>
+        </DialogHeader>
+
+        <div class="scrollbar-thin max-h-[calc(88vh-136px)] overflow-y-auto px-6 py-5">
+          <div class="grid gap-4">
+            <div class="grid grid-cols-[120px_1fr] gap-3">
+              <label class="self-start pt-2 text-sm font-medium text-slate-700">{{ avatarUi.label }}</label>
+              <div class="space-y-3">
+                <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <AvatarBadge :icon="employeeForm.icon" :label="employeeForm.name" :size="56" rounded="2xl" />
+                  <div class="text-sm text-slate-500">{{ avatarUi.helper }}</div>
+                </div>
+                <div class="grid grid-cols-6 gap-2">
+                  <button
+                    v-for="avatar in avatarOptions"
+                    :key="avatar.value"
+                    type="button"
+                    class="rounded-xl border p-1.5 transition"
+                    :class="employeeForm.icon === avatar.value ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'"
+                    @click="employeeForm.icon = avatar.value"
+                  >
+                    <AvatarBadge :icon="avatar.value" :label="avatar.label" :size="40" rounded="xl" />
+                  </button>
+                </div>
+                <input
+                  v-model="employeeForm.icon"
+                  class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                  :placeholder="avatarUi.placeholder"
+                />
               </div>
-              <div class="grid grid-cols-6 gap-2">
-                <button
-                  v-for="avatar in avatarOptions"
-                  :key="avatar.value"
-                  type="button"
-                  class="rounded-xl border p-1.5 transition"
-                  :class="employeeForm.icon === avatar.value ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'"
-                  @click="employeeForm.icon = avatar.value"
-                >
-                  <AvatarBadge :icon="avatar.value" :label="avatar.label" :size="40" rounded="xl" />
-                </button>
-              </div>
+            </div>
+
+            <div class="grid grid-cols-[120px_1fr] gap-3">
+              <label class="self-center text-sm font-medium text-slate-700">名称</label>
               <input
-                v-model="employeeForm.icon"
+                v-model="employeeForm.name"
                 class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
-                :placeholder="avatarUi.placeholder"
               />
             </div>
-          </div>
-          <div class="grid grid-cols-[120px_1fr] gap-3">
-            <label class="self-center text-sm font-medium text-slate-700">名称</label>
-            <input v-model="employeeForm.name" class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
-          </div>
-          <div class="grid grid-cols-[120px_1fr] gap-3">
-            <label class="self-start pt-2 text-sm font-medium text-slate-700">角色</label>
-            <div class="flex gap-4 text-sm">
-              <label class="flex items-center gap-2"><input v-model="employeeForm.role" type="radio" value="manager" /> 经理</label>
-              <label class="flex items-center gap-2"><input v-model="employeeForm.role" type="radio" value="worker" /> 工人</label>
-            </div>
-          </div>
-          <div class="grid grid-cols-[120px_1fr] gap-3">
-            <label class="self-center text-sm font-medium text-slate-700">模型</label>
-            <select v-model="employeeForm.model" class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500">
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="gpt-4o-mini">GPT-4o mini</option>
-              <option value="deepseek-v3">DeepSeek V3</option>
-              <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
-            </select>
-          </div>
-          <div v-if="employeeForm.role === 'worker'" class="grid grid-cols-[120px_1fr] gap-3">
-            <label class="self-start pt-2 text-sm font-medium text-slate-700">System Prompt</label>
-            <textarea v-model="employeeForm.prompt" rows="5" class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
-          </div>
-          <template v-else>
+
             <div class="grid grid-cols-[120px_1fr] gap-3">
-              <label class="self-start pt-2 text-sm font-medium text-slate-700">拆解 Prompt</label>
-              <textarea v-model="employeeForm.plannerPrompt" rows="5" class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+              <label class="self-start pt-2 text-sm font-medium text-slate-700">角色</label>
+              <div class="flex gap-4 text-sm">
+                <label class="flex items-center gap-2">
+                  <input v-model="employeeForm.role" type="radio" value="manager" />
+                  经理
+                </label>
+                <label class="flex items-center gap-2">
+                  <input v-model="employeeForm.role" type="radio" value="worker" />
+                  工人
+                </label>
+              </div>
             </div>
+
             <div class="grid grid-cols-[120px_1fr] gap-3">
-              <label class="self-start pt-2 text-sm font-medium text-slate-700">汇总 Prompt</label>
-              <textarea v-model="employeeForm.synthesizerPrompt" rows="5" class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+              <label class="self-center text-sm font-medium text-slate-700">模型</label>
+              <select
+                v-model="employeeForm.model"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+              >
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="gpt-4o-mini">GPT-4o mini</option>
+                <option value="deepseek-v3">DeepSeek V3</option>
+                <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
+              </select>
             </div>
-          </template>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="grid grid-cols-[120px_1fr] gap-3">
-              <label class="self-center text-sm font-medium text-slate-700">Temperature</label>
-              <input v-model.number="employeeForm.temperature" type="number" step="0.1" min="0" max="2" class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+
+            <div v-if="employeeForm.role === 'worker'" class="grid grid-cols-[120px_1fr] gap-3">
+              <label class="self-start pt-2 text-sm font-medium text-slate-700">System Prompt</label>
+              <textarea
+                v-model="employeeForm.prompt"
+                rows="5"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+              />
             </div>
-            <div class="grid grid-cols-[120px_1fr] gap-3">
-              <label class="self-center text-sm font-medium text-slate-700">Max Tokens</label>
-              <input v-model.number="employeeForm.maxTokens" type="number" step="500" min="1000" class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+
+            <template v-else>
+              <div class="grid grid-cols-[120px_1fr] gap-3">
+                <label class="self-start pt-2 text-sm font-medium text-slate-700">拆解 Prompt</label>
+                <textarea
+                  v-model="employeeForm.plannerPrompt"
+                  rows="5"
+                  class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                />
+              </div>
+              <div class="grid grid-cols-[120px_1fr] gap-3">
+                <label class="self-start pt-2 text-sm font-medium text-slate-700">汇总 Prompt</label>
+                <textarea
+                  v-model="employeeForm.synthesizerPrompt"
+                  rows="5"
+                  class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                />
+              </div>
+            </template>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-[120px_1fr] gap-3">
+                <label class="self-center text-sm font-medium text-slate-700">Temperature</label>
+                <input
+                  v-model.number="employeeForm.temperature"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="2"
+                  class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                />
+              </div>
+              <div class="grid grid-cols-[120px_1fr] gap-3">
+                <label class="self-center text-sm font-medium text-slate-700">Max Tokens</label>
+                <input
+                  v-model.number="employeeForm.maxTokens"
+                  type="number"
+                  step="500"
+                  min="1000"
+                  class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                />
+              </div>
             </div>
-          </div>
-          <div v-if="employeeForm.role === 'worker'" class="grid grid-cols-[120px_1fr] gap-3">
-            <label class="self-start pt-2 text-sm font-medium text-slate-700">工具</label>
-            <input
-              v-model="employeeForm.toolsText"
-              placeholder="例如: terminal, Search_Web, db_read"
-              class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
-            />
-          </div>
-          <div v-else class="grid grid-cols-[120px_1fr] gap-3">
-            <label class="self-start pt-2 text-sm font-medium text-slate-700">审批</label>
-            <label class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm text-slate-700">
-              <input v-model="employeeForm.requireApproval" type="checkbox" />
-              拆解任务需要 Boss 审批
-            </label>
+
+            <div v-if="employeeForm.role === 'worker'" class="grid grid-cols-[120px_1fr] gap-3">
+              <label class="self-start pt-2 text-sm font-medium text-slate-700">工具</label>
+              <input
+                v-model="employeeForm.toolsText"
+                placeholder="例如: terminal, Search_Web, db_read"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+              />
+            </div>
+
+            <div v-else class="grid grid-cols-[120px_1fr] gap-3">
+              <label class="self-start pt-2 text-sm font-medium text-slate-700">审批</label>
+              <label class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm text-slate-700">
+                <input v-model="employeeForm.requireApproval" type="checkbox" />
+                拆解任务需要 Boss 审批
+              </label>
+            </div>
           </div>
         </div>
-        <div class="mt-6 flex justify-end gap-3">
-          <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm" @click="employeeModalOpen = false">取消</button>
-          <button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" @click="saveEmployee">保存</button>
+
+        <div class="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+          <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm" @click="employeeModalOpen = false">
+            取消
+          </button>
+          <button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" @click="saveEmployee">
+            保存
+          </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import AvatarBadge from '../components/common/AvatarBadge.vue'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
 import { AVATAR_LIBRARY } from '../config/avatarLibrary'
 import { useSimuBossStore } from '../stores/simuBoss'
 
@@ -263,7 +329,14 @@ const employeeModalOpen = ref(false)
 const editingEmployeeId = ref(null)
 const avatarOptions = AVATAR_LIBRARY
 const avatarUi = {
-  modalTitle: (editingId) => (editingId ? '编辑员工信息' : '添加新员工'),
+  modalTitle: (editingId) =>
+    editingId
+      ? employeeForm.role === 'manager'
+        ? '编辑经理'
+        : '编辑工人'
+      : employeeForm.role === 'manager'
+        ? '招募经理'
+        : '招募工人',
   label: '头像',
   helper: '从头像库里挑一个，更像真实员工',
   placeholder: '也可以手动输入 emoji、缩写或头像值',

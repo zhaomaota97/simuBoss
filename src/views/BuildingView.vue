@@ -1,12 +1,30 @@
 <template>
   <div class="flex h-full min-h-0 bg-slate-100 text-slate-900">
+    <div class="pointer-events-none fixed right-6 top-20 z-50 flex w-[320px] flex-col gap-3">
+      <div
+        v-for="toast in toasts"
+        :key="toast.id"
+        class="rounded-2xl border px-4 py-3 shadow-lg backdrop-blur"
+        :class="
+          toast.type === 'success'
+            ? 'border-emerald-200 bg-white/95 text-emerald-700'
+            : toast.type === 'error'
+              ? 'border-rose-200 bg-white/95 text-rose-700'
+              : 'border-slate-200 bg-white/95 text-slate-700'
+        "
+      >
+        <div class="text-sm font-semibold">{{ toast.title }}</div>
+        <div v-if="toast.message" class="mt-1 text-xs leading-5 text-slate-500">{{ toast.message }}</div>
+      </div>
+    </div>
+
     <aside class="w-[280px] border-r border-slate-200 bg-white p-4">
       <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div class="text-lg font-semibold">{{ ui.title }}</div>
         <p class="mt-2 text-xs leading-5 text-slate-500">{{ ui.desc }}</p>
         <button
           class="mt-4 w-full rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white"
-          @click="selectedFloorId = store.addFloor()"
+          @click="addFloorAndToast"
         >
           {{ ui.addFloor }}
         </button>
@@ -24,8 +42,8 @@
           "
           @click="selectedFloorId = floor.id"
         >
-          <div class="font-semibold">{{ floor.name }}</div>
-          <div class="mt-1 text-xs text-slate-500">{{ ui.savedCount }} {{ savedAssignments.length }}</div>
+          <div class="font-semibold">{{ getFloorLabel(floor.id) }}</div>
+          <div class="mt-1 text-xs text-slate-500">{{ getSavedCount(floor.id) }}{{ ui.savedCount }}</div>
         </button>
       </div>
     </aside>
@@ -33,12 +51,17 @@
     <main class="flex min-w-0 flex-1 flex-col">
       <div class="border-b border-slate-200 bg-white px-6 py-4">
         <div class="flex flex-wrap items-center gap-3">
-          <input
-            :value="selectedFloor?.name || ''"
-            class="min-w-[260px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium outline-none focus:border-brand-500"
-            :placeholder="ui.floorName"
-            @change="store.updateFloorName(selectedFloorId, $event.target.value)"
-          />
+          <div class="flex min-w-[320px] items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div class="border-r border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500">
+              {{ selectedFloorLabelPrefix }}
+            </div>
+            <input
+              :value="selectedFloor?.name || ''"
+              class="min-w-0 flex-1 px-3 py-2 text-sm font-medium outline-none focus:border-brand-500"
+              :placeholder="ui.floorName"
+              @change="store.updateFloorName(selectedFloorId, $event.target.value)"
+            />
+          </div>
           <button
             class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium"
             @click="discardDraft"
@@ -90,7 +113,7 @@
             <div class="flex items-center gap-2">
               <button
                 class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600"
-                @click="fitViewportToContent"
+                @click="focusContentAndToast"
               >
                 {{ ui.focusContent }}
               </button>
@@ -148,7 +171,7 @@
             <div>
               <button
                 class="mb-2 flex w-full items-center justify-between text-xs font-semibold tracking-[0.18em] text-slate-400"
-                @click="panelOpen.team = !panelOpen.team"
+                @click="togglePanel('team')"
               >
                 <span>{{ ui.teamSection }}</span>
                 <span>{{ panelOpen.team ? '−' : '+' }}</span>
@@ -173,7 +196,7 @@
             <div>
               <button
                 class="mb-2 flex w-full items-center justify-between text-xs font-semibold tracking-[0.18em] text-slate-400"
-                @click="panelOpen.manager = !panelOpen.manager"
+                @click="togglePanel('manager')"
               >
                 <span>{{ ui.managerSection }}</span>
                 <span>{{ panelOpen.manager ? '−' : '+' }}</span>
@@ -199,7 +222,7 @@
             <div>
               <button
                 class="mb-2 flex w-full items-center justify-between text-xs font-semibold tracking-[0.18em] text-slate-400"
-                @click="panelOpen.worker = !panelOpen.worker"
+                @click="togglePanel('worker')"
               >
                 <span>{{ ui.workerSection }}</span>
                 <span>{{ panelOpen.worker ? '−' : '+' }}</span>
@@ -246,11 +269,11 @@ const WORLD_ORIGIN_X = WORLD_W / 2
 const WORLD_ORIGIN_Y = WORLD_H / 2
 
 const ui = {
-  title: '\u697c\u5c42\u5e03\u7f6e',
+  title: '\u516c\u53f8\u5927\u697c',
   desc: '\u53f3\u4fa7\u62d6\u62fd\u8fdb\u753b\u5e03\u53ef\u751f\u6210\u6839\u8282\u70b9\uff0c\u62d6\u5230\u7ecf\u7406/\u56e2\u961f\u5361\u7247\u5185\u53ef\u6302\u5230\u8fd9\u4e2a\u5c42\u7ea7\u4e0b\u3002',
   addFloor: '+ \u65b0\u589e\u697c\u5c42',
-  savedCount: '\u5df2\u751f\u6548',
-  floorName: '\u697c\u5c42\u540d\u79f0',
+  savedCount: '\u540d\u5458\u5de5',
+  floorName: '\u90e8\u95e8\u540d\u79f0',
   discard: '\u653e\u5f03\u66f4\u6539',
   clearFloor: '\u6e05\u7a7a\u672c\u5c42',
   autoArrange: '\u4e00\u952e\u6392\u5217',
@@ -280,6 +303,7 @@ const dragPalette = ref(null)
 const panState = ref(null)
 const moveState = ref(null)
 const saveError = ref('')
+const toasts = ref([])
 const view = ref({ x: 32, y: 24, scale: 1 })
 const draftMap = ref(cloneDeep(store.floorAssignments))
 const panelOpen = ref({
@@ -302,6 +326,10 @@ watch(
 )
 
 const selectedFloor = computed(() => store.floors.find((item) => item.id === selectedFloorId.value))
+const selectedFloorLabelPrefix = computed(() => {
+  const index = store.floors.findIndex((item) => item.id === selectedFloorId.value)
+  return index === -1 ? '\u697c\u5c42' : `${index + 1}\u5c42`
+})
 const savedAssignments = computed(() => store.floorAssignments[selectedFloorId.value] || [])
 const draftAssignments = computed({
   get: () => draftMap.value[selectedFloorId.value] || [],
@@ -312,6 +340,34 @@ const draftAssignments = computed({
 const isDirty = computed(
   () => JSON.stringify(draftAssignments.value) !== JSON.stringify(savedAssignments.value),
 )
+
+function pushToast(title, message = '', type = 'info') {
+  const id = crypto.randomUUID()
+  toasts.value.push({ id, title, message, type })
+  window.setTimeout(() => {
+    toasts.value = toasts.value.filter((item) => item.id !== id)
+  }, 2200)
+}
+
+function addFloorAndToast() {
+  selectedFloorId.value = store.addFloor()
+  pushToast('已新增楼层', '可以继续编辑名称并拖入新的组织节点。', 'success')
+}
+
+function focusContentAndToast() {
+  fitViewportToContent()
+  pushToast('已定位到内容', '画布视角已经重新对准当前楼层内容。')
+}
+
+function togglePanel(key) {
+  panelOpen.value[key] = !panelOpen.value[key]
+  const labels = {
+    team: ui.teamSection,
+    manager: ui.managerSection,
+    worker: ui.workerSection,
+  }
+  pushToast(panelOpen.value[key] ? '已展开面板' : '已收起面板', labels[key] || '')
+}
 const contentBounds = computed(() =>
   getPlacementBounds(draftAssignments.value, {
     padding: 96,
@@ -368,6 +424,17 @@ const workerPalette = computed(() =>
       meta: '单点执行单元',
     })),
 )
+
+function getFloorLabel(floorId) {
+  const index = store.floors.findIndex((item) => item.id === floorId)
+  const floor = store.floors[index]
+  if (!floor) return ''
+  return `${index + 1}\u5c42 - ${String(floor.name || '').trim()}`
+}
+
+function getSavedCount(floorId) {
+  return (store.floorAssignments[floorId] || []).length
+}
 
 function nextDraftId() {
   return `draft-${crypto.randomUUID()}`
@@ -577,11 +644,13 @@ function removePlacement(id) {
 function discardDraft() {
   draftAssignments.value = cloneDeep(savedAssignments.value)
   saveError.value = ''
+  pushToast('已放弃更改', '当前楼层恢复到上次保存的布局。')
 }
 
 function clearCurrentFloor() {
   draftAssignments.value = []
   saveError.value = ''
+  pushToast('已清空本层', '当前楼层的草稿布局已清空。')
 }
 
 function autoArrangeFloor() {
@@ -653,21 +722,31 @@ function autoArrangeFloor() {
     return { ...item, ...point }
   })
   saveError.value = ''
+  nextTick(() => {
+    fitViewportToContent()
+  })
+  pushToast('已完成排列', '卡片已经重新整理，并自动居中到当前视口。', 'success')
 }
 
 function saveFloor() {
   const error = validateNodes(draftAssignments.value)
   saveError.value = error
-  if (error) return
+  if (error) {
+    pushToast('保存失败', error, 'error')
+    return
+  }
   store.setFloorAssignments(selectedFloorId.value, draftAssignments.value)
+  pushToast('保存成功', '首页画布已同步当前楼层布局。', 'success')
 }
 
 function removeCurrentFloor() {
   const current = selectedFloorId.value
+  const currentName = selectedFloor.value?.name || '当前楼层'
   const fallback = store.floors.find((item) => item.id !== current)?.id
   store.removeFloor(current)
   delete draftMap.value[current]
   selectedFloorId.value = fallback || store.floors[0]?.id || 'floor-1'
+  pushToast('已删除楼层', `${currentName} 已从大楼设计中移除。`, 'success')
 }
 
 function startPan(event) {

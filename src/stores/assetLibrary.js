@@ -13,6 +13,7 @@ const DEFAULT_ASSETS = [
     tags: ['模板', '周报', '汇总'],
     content: '# 本周进展\n\n## 已完成\n- \n\n## 风险\n- \n\n## 下周计划\n- ',
     createdAt: '2026-04-13T00:00:00.000Z',
+    updatedAt: '2026-04-13T00:00:00.000Z',
   },
   {
     id: 'kb-approval-rules',
@@ -22,8 +23,10 @@ const DEFAULT_ASSETS = [
     format: 'markdown',
     path: 'assets/knowledge/references/approval-rules.md',
     tags: ['知识', '审批', '计划'],
-    content: '1. 明确目标理解\n2. 明确最终交付\n3. 子任务可执行\n4. 负责人必须合法\n5. 依赖关系可验证',
+    content:
+      '1. 明确目标理解\n2. 明确最终交付\n3. 子任务可执行\n4. 负责人必须合法\n5. 依赖关系可验证',
     createdAt: '2026-04-13T00:00:00.000Z',
+    updatedAt: '2026-04-13T00:00:00.000Z',
   },
 ]
 
@@ -41,23 +44,77 @@ function summarize(text, max = 96) {
   return `${normalized.slice(0, max)}...`
 }
 
+function normalizeAsset(payload = {}) {
+  const now = new Date().toISOString()
+  return {
+    id: payload.id || crypto.randomUUID(),
+    kind: payload.kind || 'knowledge',
+    title: String(payload.title || '').trim() || '未命名资产',
+    summary: String(payload.summary || '').trim(),
+    format: String(payload.format || 'markdown').trim() || 'markdown',
+    path: String(payload.path || '').trim(),
+    tags: Array.isArray(payload.tags)
+      ? payload.tags.map((item) => String(item || '').trim()).filter(Boolean)
+      : [],
+    content: String(payload.content || ''),
+    sourceTaskId: String(payload.sourceTaskId || ''),
+    sourcePlanId: String(payload.sourcePlanId || ''),
+    sender: String(payload.sender || ''),
+    createdAt: payload.createdAt || now,
+    updatedAt: payload.updatedAt || now,
+  }
+}
+
 export const useAssetLibraryStore = defineStore('assetLibrary', () => {
   const assets = useStorage('sb_assets', DEFAULT_ASSETS)
 
+  const sortedAssets = computed(() =>
+    [...assets.value].sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt || 0).getTime() -
+        new Date(a.updatedAt || a.createdAt || 0).getTime(),
+    ),
+  )
+
   const knowledgeAssets = computed(() =>
-    assets.value.filter((item) => item.kind === 'knowledge' || item.kind === 'template'),
+    sortedAssets.value.filter((item) => item.kind === 'knowledge' || item.kind === 'template'),
   )
   const deliverableAssets = computed(() =>
-    assets.value.filter((item) => item.kind === 'deliverable'),
+    sortedAssets.value.filter((item) => item.kind === 'deliverable'),
   )
 
   function addAsset(payload) {
-    assets.value.unshift({
-      id: payload.id || crypto.randomUUID(),
-      createdAt: payload.createdAt || new Date().toISOString(),
-      tags: payload.tags || [],
-      ...payload,
+    const asset = normalizeAsset(payload)
+    if (!asset.summary) asset.summary = summarize(asset.content || asset.title)
+    assets.value.unshift(asset)
+    return asset
+  }
+
+  function updateAsset(id, patch) {
+    const index = assets.value.findIndex((item) => item.id === id)
+    if (index === -1) return null
+    const previous = assets.value[index]
+    const next = normalizeAsset({
+      ...previous,
+      ...patch,
+      id: previous.id,
+      createdAt: previous.createdAt,
+      updatedAt: new Date().toISOString(),
     })
+    if (!next.summary) next.summary = summarize(next.content || next.title)
+    assets.value[index] = next
+    return next
+  }
+
+  function deleteAsset(id) {
+    const index = assets.value.findIndex((item) => item.id === id)
+    if (index === -1) return false
+    assets.value.splice(index, 1)
+    return true
+  }
+
+  function getAssetById(id) {
+    return assets.value.find((item) => item.id === id) || null
   }
 
   function registerDeliverable({
@@ -70,9 +127,11 @@ export const useAssetLibraryStore = defineStore('assetLibrary', () => {
   }) {
     const createdAt = new Date().toISOString()
     const dateChunk = createdAt.slice(0, 10)
-    const filename = `${slugify(title)}-${slugify(sender)}.${format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'md'}`
+    const filename = `${slugify(title)}-${slugify(sender)}.${
+      format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'md'
+    }`
 
-    addAsset({
+    return addAsset({
       kind: 'deliverable',
       title: title || '未命名交付物',
       summary: summarize(result),
@@ -84,14 +143,19 @@ export const useAssetLibraryStore = defineStore('assetLibrary', () => {
       sourcePlanId,
       sender,
       createdAt,
+      updatedAt: createdAt,
     })
   }
 
   return {
     assets,
+    sortedAssets,
     knowledgeAssets,
     deliverableAssets,
     addAsset,
+    updateAsset,
+    deleteAsset,
+    getAssetById,
     registerDeliverable,
   }
 })

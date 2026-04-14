@@ -134,10 +134,37 @@ const kindLabel = computed(() => {
   }[props.placement.kind] || '\u5de5\u4eba'
 })
 
-const statusState = computed(() => runtime.teamStatuses[props.placement.id]?.state || 'idle')
-const statusText = computed(
-  () => runtime.teamStatuses[props.placement.id]?.text || '\u7a7a\u95f2',
+const workerStatusKeys = computed(() => [...new Set([props.placement.id, props.placement.refId].filter(Boolean))])
+const activeWorkerState = computed(
+  () => workerStatusKeys.value.map((key) => runtime.workerStates[key]).find((item) => item?.isWorking) || null,
 )
+const activeTeamStatus = computed(
+  () =>
+    workerStatusKeys.value
+      .map((key) => runtime.teamStatuses[key])
+      .find((item) => item && item.state && item.state !== 'idle') ||
+    workerStatusKeys.value.map((key) => runtime.teamStatuses[key]).find(Boolean) ||
+    null,
+)
+
+const statusState = computed(() => {
+  if (activeWorkerState.value?.isWorking) {
+    return 'working'
+  }
+  if (activeTeamStatus.value?.state) {
+    return activeTeamStatus.value.state
+  }
+  return 'idle'
+})
+const statusText = computed(() => {
+  if (activeWorkerState.value?.isWorking) {
+    return activeTeamStatus.value?.text || '执行中'
+  }
+  if (activeTeamStatus.value?.text) {
+    return activeTeamStatus.value.text
+  }
+  return '\u7a7a\u95f2'
+})
 
 const statusDotClass = computed(() => {
   return {

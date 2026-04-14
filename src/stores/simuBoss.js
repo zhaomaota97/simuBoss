@@ -8,10 +8,18 @@ const STORAGE_VERSION = 'boss-sim-seed-v2'
 
 const TEXT = {
   cloneSuffix: ' (\u526f\u672c)',
-  defaultFloorName: '1\u5c42 - \u4e3b\u529e\u516c\u533a',
-  floor2Name: '2\u5c42 - \u7814\u53d1\u4e2d\u5fc3',
-  floor3Name: '3\u5c42 - \u7b56\u7565\u4e0e\u4ea4\u4ed8',
-  newFloorSuffix: '\u5c42 - \u5206\u533a',
+  defaultFloorName: '\u4e3b\u529e\u516c\u533a',
+  floor2Name: '\u7814\u53d1\u4e2d\u5fc3',
+  floor3Name: '\u7b56\u7565\u4e0e\u4ea4\u4ed8',
+  newFloorName: '\u65b0\u90e8\u95e8',
+}
+
+function normalizeFloorName(name, fallback = TEXT.newFloorName) {
+  const cleaned = String(name || '')
+    .replace(/^\s*\d+\s*层\s*[-－]\s*/, '')
+    .trim()
+
+  return cleaned || fallback
 }
 
 const DEFAULT_EMPS = [
@@ -266,6 +274,7 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
     const validIds = new Set(floors.value.map((floor) => floor.id))
 
     floors.value.forEach((floor) => {
+      floor.name = normalizeFloorName(floor.name)
       if (!canvasLayouts.value[floor.id]) canvasLayouts.value[floor.id] = []
       if (!floorAssignments.value[floor.id]) floorAssignments.value[floor.id] = []
     })
@@ -400,7 +409,7 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
     const id = `floor-${maxIndex + 1}`
     floors.value.push({
       id,
-      name: name || `${maxIndex + 1}${TEXT.newFloorSuffix}`,
+      name: normalizeFloorName(name, TEXT.newFloorName),
       scale: 1,
     })
     ensureFloorScopedState()
@@ -409,7 +418,14 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
 
   function updateFloorName(id, name) {
     const floor = floors.value.find((item) => item.id === id)
-    if (floor) floor.name = name
+    if (floor) floor.name = normalizeFloorName(name)
+  }
+
+  function getFloorDisplayName(id) {
+    const index = floors.value.findIndex((item) => item.id === id)
+    const floor = floors.value[index]
+    if (!floor) return ''
+    return `${index + 1}\u5c42 - ${normalizeFloorName(floor.name)}`
   }
 
   function removeFloor(id) {
@@ -505,6 +521,7 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
     cloneTeam,
     addFloor,
     updateFloorName,
+    getFloorDisplayName,
     removeFloor,
     setFloorScale,
     addCanvasNode,
