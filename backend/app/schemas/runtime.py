@@ -34,6 +34,18 @@ class TimelineEvent(BaseModel):
     message: str
 
 
+class RuntimeDeliverable(BaseModel):
+    type: Literal["text", "ppt"]
+    format: str = "markdown"
+    content: str = ""
+    file_name: str = Field(default="", alias="fileName")
+    download_url: str = Field(default="", alias="downloadUrl")
+    path: str = ""
+    summary: str = ""
+
+    model_config = {"populate_by_name": True}
+
+
 class WorkerResult(BaseModel):
     task_id: str
     assignee_id: str
@@ -41,6 +53,7 @@ class WorkerResult(BaseModel):
     title: str
     result: str
     depends_on: list[str] = Field(default_factory=list)
+    deliverable: RuntimeDeliverable | None = None
 
 
 class RuntimeTaskRequest(BaseModel):
@@ -60,5 +73,6 @@ class RuntimeTaskResponse(BaseModel):
     timeline: list[TimelineEvent]
     worker_results: list[WorkerResult] = Field(alias="workerResults")
     final_result: str = Field(alias="finalResult")
+    final_deliverable: RuntimeDeliverable | None = Field(default=None, alias="finalDeliverable")
 
     model_config = {"populate_by_name": True}

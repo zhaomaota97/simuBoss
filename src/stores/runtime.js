@@ -5,10 +5,13 @@ import { streamChatCompletion } from '../services/llm'
 export const useRuntimeStore = defineStore('runtime', () => {
   const approvals = ref([])
   const deliveries = ref([])
-  const logs = ref([{ id: crypto.randomUUID(), role: 'sys', text: '系统启动完成，已同步本地数据。' }])
+  const logs = ref([
+    { id: crypto.randomUUID(), role: 'sys', text: '系统启动完成，已同步本地数据。' },
+  ])
   const teamQueues = ref({})
   const teamStatuses = ref({})
   const workerStates = ref({})
+  const taskFlows = ref({})
   const workerLocks = new Map()
 
   const approvalCount = computed(() => approvals.value.length)
@@ -18,27 +21,51 @@ export const useRuntimeStore = defineStore('runtime', () => {
   }
 
   function ensureTeamQueue(teamId) {
-    if (!teamQueues.value[teamId]) teamQueues.value[teamId] = []
-    if (!teamStatuses.value[teamId]) teamStatuses.value[teamId] = { state: 'idle', text: '空闲等待任务' }
+    if (!teamQueues.value[teamId]) {
+      teamQueues.value = {
+        ...teamQueues.value,
+        [teamId]: [],
+      }
+    }
+    if (!teamStatuses.value[teamId]) {
+      teamStatuses.value = {
+        ...teamStatuses.value,
+        [teamId]: { state: 'idle', text: '空闲等待任务' },
+      }
+    }
     return teamQueues.value[teamId]
   }
 
   function setTeamStatus(teamId, state, text) {
-    teamStatuses.value[teamId] = { state, text }
+    teamStatuses.value = {
+      ...teamStatuses.value,
+      [teamId]: { state, text },
+    }
   }
 
   function enqueueTask(teamId, task, payload = {}) {
     const queue = ensureTeamQueue(teamId)
-    queue.push({
-      id: crypto.randomUUID(),
-      task,
-      payload,
-    })
+    teamQueues.value = {
+      ...teamQueues.value,
+      [teamId]: [
+        ...queue,
+        {
+          id: crypto.randomUUID(),
+          task,
+          payload,
+        },
+      ],
+    }
   }
 
   function shiftTask(teamId) {
     const queue = ensureTeamQueue(teamId)
-    return queue.shift()
+    const [head, ...rest] = queue
+    teamQueues.value = {
+      ...teamQueues.value,
+      [teamId]: rest,
+    }
+    return head
   }
 
   function createApproval(entry) {
@@ -64,25 +91,145 @@ export const useRuntimeStore = defineStore('runtime', () => {
 
   function ensureWorkerState(workerKey) {
     if (!workerStates.value[workerKey]) {
-      workerStates.value[workerKey] = {
-        isWorking: false,
-        currentTask: '无任务',
-        streamedContent: '',
-        queue: [],
+      workerStates.value = {
+        ...workerStates.value,
+        [workerKey]: {
+          isWorking: false,
+          currentTask: '无任务',
+          streamedContent: '',
+          queue: [],
+        },
       }
     }
     return workerStates.value[workerKey]
   }
 
-  async function runWorkerTask({ workerKey, workerName, systemPrompt, userPrompt, entityId = "" }) {
+  function patchWorkerState(workerKey, patch) {
+    const current = ensureWorkerState(workerKey)
+    workerStates.value = {
+      ...workerStates.value,
+      [workerKey]: {
+        ...current,
+        ...patch,
+      },
+    }
+    return workerStates.value[workerKey]
+  }
+
+  function upsertTaskFlow(ownerKey, plan, meta = {}) {
+    if (!ownerKey || !plan?.tasks?.length) return null
+    const previous = taskFlows.value[ownerKey]
+    const previousTasks = previous?.tasks || {}
+    const nextTasks = Object.fromEntries(
+      plan.tasks.map((task) => {
+        const existing = previousTasks[task.id] || {}
+        return [
+          task.id,
+          {
+            ...task,
+            status: existing.status || (task.dependsOn?.length ? 'pending' : 'ready'),
+            result: existing.result || '',
+            error: existing.error || '',
+          },
+        ]
+      }),
+    )
+
+    taskFlows.value = {
+      ...taskFlows.value,
+      [ownerKey]: {
+        ownerKey,
+        rootId: meta.rootId || previous?.rootId || ownerKey,
+        rootName: meta.rootName || previous?.rootName || '',
+        summary: plan.summary || previous?.summary || '',
+        deliverable: plan.deliverable || previous?.deliverable || '',
+        tasks: nextTasks,
+        taskOrder: plan.tasks.map((task) => task.id),
+        updatedAt: Date.now(),
+      },
+    }
+    return taskFlows.value[ownerKey]
+  }
+
+  function patchTaskFlowTask(ownerKey, taskId, patch) {
+    const flow = taskFlows.value[ownerKey]
+    if (!flow?.tasks?.[taskId]) return null
+    const nextTask = {
+      ...flow.tasks[taskId],
+      ...patch,
+    }
+    taskFlows.value = {
+      ...taskFlows.value,
+      [ownerKey]: {
+        ...flow,
+        tasks: {
+          ...flow.tasks,
+          [taskId]: nextTask,
+        },
+        updatedAt: Date.now(),
+      },
+    }
+    return nextTask
+  }
+
+  function markTaskFlowTaskRunning(ownerKey, taskId) {
+    return patchTaskFlowTask(ownerKey, taskId, { status: 'running', error: '' })
+  }
+
+  function markTaskFlowTaskDone(ownerKey, taskId, result = '') {
+    const task = patchTaskFlowTask(ownerKey, taskId, { status: 'done', result, error: '' })
+    if (!task) return null
+    const flow = taskFlows.value[ownerKey]
+    const completed = new Set(
+      Object.values(flow.tasks)
+        .filter((item) => item.status === 'done')
+        .map((item) => item.id),
+    )
+
+    const patchedTasks = Object.fromEntries(
+      Object.entries(flow.tasks).map(([id, item]) => {
+        if (item.status === 'pending' && (item.dependsOn || []).every((depId) => completed.has(depId))) {
+          return [id, { ...item, status: 'ready' }]
+        }
+        return [id, item]
+      }),
+    )
+
+    taskFlows.value = {
+      ...taskFlows.value,
+      [ownerKey]: {
+        ...flow,
+        tasks: patchedTasks,
+        updatedAt: Date.now(),
+      },
+    }
+    return taskFlows.value[ownerKey]
+  }
+
+  function markTaskFlowTaskFailed(ownerKey, taskId, error = '') {
+    return patchTaskFlowTask(ownerKey, taskId, { status: 'failed', error })
+  }
+
+  function clearTaskFlow(ownerKey) {
+    if (!ownerKey || !taskFlows.value[ownerKey]) return
+    const next = { ...taskFlows.value }
+    delete next[ownerKey]
+    taskFlows.value = next
+  }
+
+  async function runWorkerTask({ workerKey, workerName, systemPrompt, userPrompt }) {
     const state = ensureWorkerState(workerKey)
-    state.queue.push(userPrompt)
+    patchWorkerState(workerKey, {
+      queue: [...(state.queue || []), userPrompt],
+    })
     const prior = workerLocks.get(workerKey) || Promise.resolve()
 
     const currentRun = prior.then(async () => {
-      state.isWorking = true
-      state.currentTask = userPrompt
-      state.streamedContent = ''
+      patchWorkerState(workerKey, {
+        isWorking: true,
+        currentTask: userPrompt,
+        streamedContent: '',
+      })
       log('wrk', `[${workerName}] 开始专注处理 "${userPrompt}"`)
 
       try {
@@ -90,17 +237,25 @@ export const useRuntimeStore = defineStore('runtime', () => {
           systemPrompt,
           userPrompt,
           onChunk: (_, fullText) => {
-            state.streamedContent = fullText
+            patchWorkerState(workerKey, {
+              streamedContent: fullText,
+            })
           },
         })
         return result
       } catch (error) {
-        state.streamedContent = String(error?.message || error)
-        return `执行异常: ${state.streamedContent}`
+        const message = String(error?.message || error)
+        patchWorkerState(workerKey, {
+          streamedContent: message,
+        })
+        return `执行异常: ${message}`
       } finally {
-        state.queue.shift()
-        state.isWorking = false
-        state.currentTask = '无任务'
+        const latest = workerStates.value[workerKey] || state
+        patchWorkerState(workerKey, {
+          queue: (latest.queue || []).slice(1),
+          isWorking: false,
+          currentTask: '无任务',
+        })
       }
     })
 
@@ -115,6 +270,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     teamQueues.value = {}
     teamStatuses.value = {}
     workerStates.value = {}
+    taskFlows.value = {}
   }
 
   return {
@@ -124,6 +280,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     teamQueues,
     teamStatuses,
     workerStates,
+    taskFlows,
     approvalCount,
     log,
     ensureTeamQueue,
@@ -134,6 +291,13 @@ export const useRuntimeStore = defineStore('runtime', () => {
     resolveApproval,
     addDelivery,
     ensureWorkerState,
+    patchWorkerState,
+    upsertTaskFlow,
+    patchTaskFlowTask,
+    markTaskFlowTaskRunning,
+    markTaskFlowTaskDone,
+    markTaskFlowTaskFailed,
+    clearTaskFlow,
     runWorkerTask,
     clearRuntime,
   }

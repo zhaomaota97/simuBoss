@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
+import { cloneDeep } from '../utils/tree'
 
 const DEFAULT_ASSETS = [
   {
@@ -60,13 +61,14 @@ function normalizeAsset(payload = {}) {
     sourceTaskId: String(payload.sourceTaskId || ''),
     sourcePlanId: String(payload.sourcePlanId || ''),
     sender: String(payload.sender || ''),
+    deliverable: payload.deliverable || null,
     createdAt: payload.createdAt || now,
     updatedAt: payload.updatedAt || now,
   }
 }
 
 export const useAssetLibraryStore = defineStore('assetLibrary', () => {
-  const assets = useStorage('sb_assets', DEFAULT_ASSETS)
+  const assets = useStorage('sb_assets', cloneDeep(DEFAULT_ASSETS))
 
   const sortedAssets = computed(() =>
     [...assets.value].sort(
@@ -124,9 +126,27 @@ export const useAssetLibraryStore = defineStore('assetLibrary', () => {
     sourceTaskId = '',
     sourcePlanId = '',
     format = 'markdown',
+    deliverable = null,
   }) {
     const createdAt = new Date().toISOString()
     const dateChunk = createdAt.slice(0, 10)
+    if (deliverable?.type === 'ppt') {
+      return addAsset({
+        kind: 'deliverable',
+        title: title || '未命名交付物',
+        summary: deliverable.summary || summarize(result || deliverable.fileName || title),
+        format: 'pptx',
+        path: deliverable.downloadUrl || deliverable.path || '',
+        tags: ['交付物', 'PPT', sender].filter(Boolean),
+        content: String(result || ''),
+        deliverable,
+        sourceTaskId,
+        sourcePlanId,
+        sender,
+        createdAt,
+        updatedAt: createdAt,
+      })
+    }
     const filename = `${slugify(title)}-${slugify(sender)}.${
       format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'md'
     }`
@@ -139,12 +159,17 @@ export const useAssetLibraryStore = defineStore('assetLibrary', () => {
       path: `assets/deliverables/${dateChunk}/${filename}`,
       tags: ['交付物', sender].filter(Boolean),
       content: String(result || ''),
+      deliverable,
       sourceTaskId,
       sourcePlanId,
       sender,
       createdAt,
       updatedAt: createdAt,
     })
+  }
+
+  function resetAssets() {
+    assets.value = cloneDeep(DEFAULT_ASSETS)
   }
 
   return {
@@ -157,5 +182,6 @@ export const useAssetLibraryStore = defineStore('assetLibrary', () => {
     deleteAsset,
     getAssetById,
     registerDeliverable,
+    resetAssets,
   }
 })
