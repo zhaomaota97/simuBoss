@@ -55,6 +55,84 @@ class GraphRuntimeService:
             summary=self._summarize(text),
         )
 
+    def _ppt_content_schema_guidance(self) -> str:
+        return """
+如果当前任务目标是输出 PPT 渲染 JSON，你必须只输出一个 JSON 对象，不要输出解释文字，不要输出 Markdown。
+
+顶层必须包含：
+{
+  "cover": {"title": "封面标题", "subtitle": "封面副标题"},
+  "slides": [...],
+  "ending": {"name": "结尾页署名"}
+}
+
+slides 中每页 type 只能是以下之一，并且必须补齐对应字段：
+
+1. module
+{
+  "type": "module",
+  "module_no": "MODULE 01",
+  "module_name": "模块名",
+  "subtitle": "模块副标题",
+  "tagline": "模块标语"
+}
+
+2. three_cols
+{
+  "type": "three_cols",
+  "tag": "标签",
+  "title": "标题",
+  "cols": [
+    {"heading": "列1标题", "body": "列1正文", "quote": "列1引用"},
+    {"heading": "列2标题", "body": "列2正文", "quote": "列2引用"},
+    {"heading": "列3标题", "body": "列3正文", "quote": "列3引用"}
+  ],
+  "footer": "页脚总结"
+}
+
+3. steps
+{
+  "type": "steps",
+  "tag": "标签",
+  "title": "标题",
+  "intro": "导语",
+  "steps": [
+    {"step": "STEP 01", "phase": "阶段1", "action": "动作1", "detail_a": "细节A1", "detail_b": "细节B1"},
+    {"step": "STEP 02", "phase": "阶段2", "action": "动作2", "detail_a": "细节A2", "detail_b": "细节B2"},
+    {"step": "STEP 03", "phase": "阶段3", "action": "动作3", "detail_a": "细节A3", "detail_b": "细节B3"}
+  ],
+  "footer": "页脚总结"
+}
+
+4. numbered_list
+{
+  "type": "numbered_list",
+  "tag": "标签",
+  "title": "标题",
+  "intro": "导语",
+  "items": [
+    {"no": "01", "heading": "条目1标题", "body": "条目1正文"},
+    {"no": "02", "heading": "条目2标题", "body": "条目2正文"},
+    {"no": "03", "heading": "条目3标题", "body": "条目3正文"}
+  ],
+  "footer": "页脚总结"
+}
+
+5. four_grid
+{
+  "type": "four_grid",
+  "tag": "标签",
+  "title": "标题",
+  "items": [
+    {"heading": "宫格1标题", "body": "宫格1正文", "quote": "宫格1引用"},
+    {"heading": "宫格2标题", "body": "宫格2正文", "quote": "宫格2引用"},
+    {"heading": "宫格3标题", "body": "宫格3正文", "quote": "宫格3引用"},
+    {"heading": "宫格4标题", "body": "宫格4正文", "quote": "宫格4引用"}
+  ],
+  "footer": "页脚总结"
+}
+"""
+
     def _default_plan_for(self, request: RuntimeTaskRequest) -> ExecutionPlan:
         return ExecutionPlan(
             summary=f"执行任务：{request.task}",
@@ -118,22 +196,21 @@ class GraphRuntimeService:
         user_prompt = f"""
 总任务：{request.task}
 经理：{request.manager_name}
-原始材料：
-{self._source_material_text(request)[:8000]}
+原始材料：{self._source_material_text(request)[:8000]}
 
 请输出 JSON，字段结构必须为：
 {{
   "summary": "目标理解",
-  "deliverable": "最终交付物",
+  "deliverable": "最终交付形态",
   "tasks": [
     {{
       "id": "t1",
       "title": "子任务标题",
       "assigneeId": "worker-1",
-      "assigneeName": "执行者名称",
-      "task": "要执行的具体内容",
+      "assigneeName": "执行人名称",
+      "task": "完整执行指令",
       "dependsOn": [],
-      "reason": "为什么分给他"
+      "reason": "分配原因"
     }}
   ],
   "risks": [],
@@ -157,7 +234,7 @@ class GraphRuntimeService:
             )
             return plan
         except Exception:
-            plan = self._default_plan_for(request)
+            fallback = self._default_plan_for(request)
             timeline.append(
                 self._timeline_entry(
                     "planner_fallback",
@@ -165,7 +242,7 @@ class GraphRuntimeService:
                     "计划生成失败，已退回到默认单任务计划。",
                 )
             )
-            return plan
+            return fallback
 
     def _dependency_text(self, task: PlanTask, deliveries_by_task_id: dict[str, dict]) -> str:
         blocks = []
@@ -178,8 +255,7 @@ class GraphRuntimeService:
         return "\n".join(blocks) if blocks else "无前置依赖交付。"
 
     def _find_renderer_payload(self, task: PlanTask, deliveries_by_task_id: dict[str, dict]) -> dict:
-        candidate_ids = list(task.depends_on)
-        for dependency_id in reversed(candidate_ids):
+        for dependency_id in reversed(list(task.depends_on)):
             dependency_result = deliveries_by_task_id.get(dependency_id)
             if not dependency_result:
                 continue
@@ -194,6 +270,29 @@ class GraphRuntimeService:
                 return parsed
         raise RuntimeError("没有找到可用于 PPT 渲染的最终 JSON 对象。")
 
+    def _build_worker_prompt(
+        self,
+        request: RuntimeTaskRequest,
+        task: PlanTask,
+        dependency_text: str,
+        source_material: str,
+    ) -> str:
+        extra_guidance = ""
+        if "content.json" in str(task.task or "").lower():
+            extra_guidance = f"\n\n{self._ppt_content_schema_guidance()}"
+        return f"""
+总任务：{request.task}
+当前子任务：{task.title}
+执行人：{task.assignee_name or task.assignee_id}
+任务说明：{task.task}
+
+原始材料：{source_material[:12000]}
+
+前置依赖交付：
+{dependency_text}
+
+请直接完成当前子任务，并输出你的交付结果正文。{extra_guidance}"""
+
     async def _run_worker_task(
         self,
         request: RuntimeTaskRequest,
@@ -204,7 +303,9 @@ class GraphRuntimeService:
         config = self._assignee_config(request, task)
         if config.get("executionMode") == "ppt_renderer":
             payload = self._find_renderer_payload(task, deliveries_by_task_id)
-            deliverable = RuntimeDeliverable.model_validate(render_ppt_from_json(payload, task.title or request.task))
+            deliverable = RuntimeDeliverable.model_validate(
+                render_ppt_from_json(payload, task.title or request.task)
+            )
             return deliverable.summary or f"已生成 {deliverable.file_name}", deliverable
 
         source_material = self._source_material_text(request)
@@ -213,20 +314,12 @@ class GraphRuntimeService:
             "请直接做事，不要向用户反问或索要额外信息。"
             "在信息不足时，做出最合理的假设并继续推进。"
         )
-        user_prompt = f"""
-总任务：{request.task}
-当前子任务：{task.title}
-执行人：{task.assignee_name or task.assignee_id}
-任务说明：{task.task}
-
-原始材料：
-{source_material[:12000]}
-
-前置依赖交付：
-{dependency_text}
-
-请直接完成当前子任务，并输出你的交付结果正文。
-"""
+        user_prompt = self._build_worker_prompt(
+            request=request,
+            task=task,
+            dependency_text=dependency_text,
+            source_material=source_material,
+        )
         result_text = await deepseek_client.chat_completion(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -246,20 +339,12 @@ class GraphRuntimeService:
             "请直接做事，不要向用户反问或索要额外信息。"
             "在信息不足时，做出最合理的假设并继续推进。"
         )
-        user_prompt = f"""
-总任务：{request.task}
-当前子任务：{task.title}
-执行人：{task.assignee_name or task.assignee_id}
-任务说明：{task.task}
-
-原始材料：
-{self._source_material_text(request)[:12000]}
-
-前置依赖交付：
-{dependency_text}
-
-请直接完成当前子任务，并输出你的交付结果正文。
-"""
+        user_prompt = self._build_worker_prompt(
+            request=request,
+            task=task,
+            dependency_text=dependency_text,
+            source_material=self._source_material_text(request),
+        )
         async for delta in deepseek_client.stream_chat_completion(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -300,8 +385,7 @@ class GraphRuntimeService:
 子任务执行结果：
 {chr(10).join(result_lines)}
 
-请输出最终交付内容。
-""",
+请输出最终交付内容。""",
             temperature=0.2,
         )
         return final_result, self._make_text_deliverable(final_result)
@@ -401,6 +485,7 @@ class GraphRuntimeService:
                 result_text = ""
                 deliverable = None
                 config = self._assignee_config(request, task)
+
                 if self._is_direct_worker_execution(request) and config.get("executionMode") != "ppt_renderer":
                     async for delta in self._stream_worker_task(request, task, dependency_text):
                         result_text += delta
@@ -409,6 +494,7 @@ class GraphRuntimeService:
                             {
                                 "stage": "worker",
                                 "taskId": task.id,
+                                "assigneeId": task.assignee_id,
                                 "actor": task.assignee_name or task.assignee_id,
                                 "delta": delta,
                                 "fullText": result_text,
@@ -432,6 +518,7 @@ class GraphRuntimeService:
                                 {
                                     "stage": "worker",
                                     "taskId": task.id,
+                                    "assigneeId": task.assignee_id,
                                     "actor": task.assignee_name or task.assignee_id,
                                     "delta": delta,
                                     "fullText": streamed_text,

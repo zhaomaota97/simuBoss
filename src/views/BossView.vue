@@ -2158,7 +2158,7 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
         },
         assigneeConfigs,
       },
-      onEvent: ({ event, payload }) => processRuntimeStreamEvent(placement, event, payload),
+      onEvent: ({ event, payload }) => handleRuntimeStreamEvent(placement, event, payload),
     })
     result = runtimeResult.finalResult || ''
 

@@ -14,9 +14,11 @@ app/schemas/__init__.py
 app/schemas/auth.py
 app/schemas/runtime.py
 app/services/__init__.py
+app/services/document_parser.py
 app/services/graph_runner.py
 app/services/json_utils.py
 app/services/llm_client.py
+app/services/ppt_renderer.py
 app/services/session_store.py
 simuboss_backend.egg-info/PKG-INFO
 simuboss_backend.egg-info/SOURCES.txt
