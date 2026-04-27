@@ -126,6 +126,37 @@
                 @mousedown="startPan"
                 @wheel.prevent="handleWheel"
               >
+                <svg
+                  v-if="taskFlowOverlay.lines.length"
+                  class="pointer-events-none absolute inset-0 z-10"
+                  aria-hidden="true"
+                >
+                  <defs>
+                    <marker
+                      id="task-flow-arrow"
+                      markerWidth="10"
+                      markerHeight="10"
+                      refX="8"
+                      refY="5"
+                      orient="auto"
+                      markerUnits="strokeWidth"
+                    >
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+                    </marker>
+                  </defs>
+                  <g v-for="line in taskFlowOverlay.lines" :key="line.id" :class="line.colorClass">
+                    <path
+                      :d="line.path"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-opacity="0.82"
+                      marker-end="url(#task-flow-arrow)"
+                    />
+                  </g>
+                </svg>
                 <div class="absolute inset-0" :style="worldStyle">
                   <div
                     class="relative bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1.2px,transparent_0)] bg-[length:24px_24px] bg-white"
@@ -211,17 +242,47 @@
           draggable="true"
           @dragstart="dragTask = task"
         >
-          <div class="font-semibold text-slate-800">{{ task.title }}</div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="font-semibold text-slate-800">{{ task.title }}</div>
+            <span
+              class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
+              :class="
+                task.kind === 'word'
+                  ? 'bg-indigo-50 text-indigo-700'
+                  : 'bg-amber-50 text-amber-700'
+              "
+            >
+              {{ task.kind === 'word' ? 'WORD' : 'TEXT' }}
+            </span>
+          </div>
+          <div v-if="task.kind === 'word'" class="mt-1 text-[11px] text-slate-500">
+            {{ task.fileName }}
+          </div>
           <div class="mt-1 text-[11px] text-slate-500">{{ ui.taskDragHint }}</div>
         </div>
       </div>
       <div class="border-t border-slate-200 bg-slate-50 p-4">
-        <button
-          class="mb-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-          @click="longTaskModalOpen = true"
-        >
-          {{ ui.longTask }}
-        </button>
+        <input
+          ref="wordUploadRef"
+          type="file"
+          accept=".docx"
+          class="hidden"
+          @change="handleWordUpload"
+        />
+        <div class="mb-3 grid grid-cols-2 gap-2">
+          <button
+            class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+            @click="longTaskModalOpen = true"
+          >
+            {{ ui.longTask }}
+          </button>
+          <button
+            class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700"
+            @click="openWordUpload"
+          >
+            {{ ui.uploadWord }}
+          </button>
+        </div>
         <div class="flex gap-2">
           <input
             v-model="newTaskInput"
@@ -243,7 +304,7 @@
     <Dialog v-model:open="longTaskModalOpen">
       <DialogContent class="max-w-3xl p-0" hide-close>
       <div class="w-full rounded-2xl bg-white shadow-2xl">
-        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div class="hidden">
           <div class="text-lg font-semibold text-slate-900">{{ ui.longTaskTitle }}</div>
           <button class="text-xl text-slate-400" @click="closeLongTaskModal">x</button>
         </div>
@@ -268,17 +329,13 @@
     </Dialog>
 
     <Dialog :open="Boolean(selectedApproval)" @update:open="(open) => !open && closeApprovalModal()">
-      <DialogContent class="h-[80vh] max-w-4xl p-0" hide-close>
-      <div class="flex h-full w-full flex-col rounded-2xl bg-white shadow-2xl">
-        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div>
-            <div class="text-lg font-semibold text-slate-900">{{ selectedApproval.task }}</div>
-            <div class="mt-1 text-xs text-slate-500">
-              {{ ui.approver }}{{ selectedApproval.managerName }}
-            </div>
-          </div>
-          <button class="text-xl text-slate-400" @click="closeApprovalModal">x</button>
-        </div>
+      <DialogContent v-if="selectedApproval" class="flex h-[80vh] max-w-4xl flex-col p-0">
+        <DialogHeader class="border-b border-slate-200 px-5 py-4 text-left">
+          <DialogTitle>{{ selectedApproval.task }}</DialogTitle>
+          <DialogDescription>
+            {{ ui.approver }}{{ selectedApproval.managerName }}
+          </DialogDescription>
+        </DialogHeader>
         <div class="scrollbar-thin flex-1 overflow-y-auto bg-slate-50 p-5">
           <div class="rounded-2xl border border-slate-200 bg-white p-4">
             <div class="mb-3 text-sm font-semibold text-slate-700">{{ ui.decompositionTitle }}</div>
@@ -542,12 +599,11 @@
             {{ ui.approve }}
           </button>
         </div>
-      </div>
       </DialogContent>
     </Dialog>
 
     <Dialog :open="rejectModalOpen && selectedApproval" @update:open="(open) => !open && closeRejectModal()">
-      <DialogContent class="max-w-xl p-0" hide-close>
+      <DialogContent v-if="selectedApproval" class="max-w-xl p-0" hide-close>
       <div class="w-full rounded-2xl bg-white shadow-2xl">
         <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div class="text-lg font-semibold text-slate-900">填写驳回意见</div>
@@ -578,9 +634,13 @@
     </Dialog>
 
     <Dialog :open="Boolean(selectedDelivery)" @update:open="(open) => !open && (selectedDelivery = null)">
-      <DialogContent class="h-[80vh] max-w-5xl p-0" hide-close>
-      <div class="flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <DialogContent v-if="selectedDelivery" class="flex h-[80vh] max-w-5xl flex-col p-0">
+        <div class="flex h-full w-full flex-col overflow-hidden">
+        <DialogHeader class="border-b border-slate-200 px-5 py-4 text-left">
+          <DialogTitle>{{ selectedDelivery.task }}</DialogTitle>
+          <DialogDescription>处理方：{{ selectedDelivery.sender }}</DialogDescription>
+        </DialogHeader>
+        <div class="hidden">
           <div>
             <div class="text-lg font-semibold text-slate-900">{{ selectedDelivery.task }}</div>
             <div class="mt-1 text-xs text-slate-500">处理方：{{ selectedDelivery.sender }}</div>
@@ -603,24 +663,20 @@
       </DialogContent>
     </Dialog>
 
-    <div
-      v-if="selectedEntity"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
-    >
-      <div class="flex h-[80vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl">
-        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div class="text-lg font-semibold text-slate-900">{{ displayName(selectedEntity) }}</div>
-          <button class="text-xl text-slate-400" @click="selectedEntity = null">x</button>
-        </div>
-        <div class="scrollbar-thin flex-1 overflow-y-auto p-5">
+    <Dialog :open="Boolean(selectedEntity)" @update:open="(open) => !open && (selectedEntity = null)">
+      <DialogContent class="flex h-[82vh] max-w-6xl flex-col p-0">
+        <DialogHeader class="border-b border-slate-200 px-5 py-4 text-left">
+          <DialogTitle>{{ selectedEntity ? displayName(selectedEntity) : '' }}</DialogTitle>
+          <DialogDescription>
+            {{ selectedEntity?.kind === 'team' ? '团队详情与运行态信息' : '员工详情与运行态信息' }}
+          </DialogDescription>
+        </DialogHeader>
+        <div class="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+          <div class="scrollbar-thin overflow-y-auto border-r border-slate-200 bg-slate-50 px-5 py-5">
             <div class="grid gap-3">
               <div class="grid grid-cols-[120px_1fr] border-b border-slate-200 pb-3 text-sm">
                 <div class="font-semibold text-slate-500">{{ ui.statusLabel }}</div>
               <div>{{ selectedEntityStatusText }}</div>
-              </div>
-              <div class="grid grid-cols-[120px_1fr] border-b border-slate-200 pb-3 text-sm">
-                <div class="font-semibold text-slate-500">{{ ui.positionLabel }}</div>
-              <div>{{ selectedEntity.x || 0 }}, {{ selectedEntity.y || 0 }}</div>
               </div>
               <div v-if="selectedEntityApprovals.length" class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div class="mb-3 text-sm font-semibold text-slate-700">拆解与审批</div>
@@ -662,24 +718,35 @@
                   </div>
                 </div>
               </div>
-              <div class="rounded-xl bg-slate-950 p-4">
-                <div class="mb-3 text-sm font-semibold text-amber-400">{{ ui.stream }}</div>
-                <pre
-                class="scrollbar-thin max-h-[32vh] overflow-auto whitespace-pre-wrap font-mono text-xs text-slate-200"
-                >{{ selectedEntityStreamText }}</pre
-              >
-              </div>
             </div>
+          </div>
+          <div class="flex min-h-0 flex-col bg-slate-950">
+            <div class="border-b border-slate-800 px-5 py-4">
+              <div class="text-sm font-semibold text-amber-400">{{ ui.stream }}</div>
+              <div class="mt-1 text-xs text-slate-400">实时输出会持续刷新到这一区域</div>
+            </div>
+            <div class="scrollbar-thin min-h-0 flex-1 overflow-auto px-5 py-5">
+              <pre
+                class="min-h-full whitespace-pre-wrap rounded-2xl bg-slate-900 p-4 font-mono text-xs leading-6 text-slate-200"
+              >{{ selectedEntityStreamText }}</pre>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PlacementNode from '../components/canvas/PlacementNode.vue'
-import { Dialog, DialogContent } from '../components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
 import { DEFAULT_SYSTEM_PROMPTS } from '../config/prompts'
 import { runPlanScheduler } from '../runtime/scheduler'
 import { executeRuntimeTask } from '../services/backendRuntime'
@@ -710,6 +777,7 @@ const ui = {
   createTask: '\u521b\u5efa\u4efb\u52a1',
   cancel: '\u53d6\u6d88',
   longTask: '\u65b0\u5efa\u957f\u4efb\u52a1',
+  uploadWord: '上传 Word',
   longTaskTitle: '\u65b0\u5efa\u957f\u4efb\u52a1',
   longTaskPlaceholder:
     '\u5728\u8fd9\u91cc\u8f93\u5165\u5b8c\u6574\u7684\u4efb\u52a1\u80cc\u666f\u3001\u76ee\u6807\u3001\u8981\u6c42\u548c\u9650\u5236...',
@@ -738,7 +806,7 @@ const assetLibrary = useAssetLibraryStore()
 const currentFloorId = ref(store.floors[0]?.id || 'floor-1')
 const floorRailRef = ref(null)
 const canvasShellRef = ref(null)
-const floorButtonRefs = ref({})
+const floorButtonRefs = {}
 const floorCalloutTop = ref(null)
 const viewportRef = ref(null)
 const panState = ref(null)
@@ -751,6 +819,7 @@ const dragTask = ref('')
 const newTaskInput = ref('')
 const longTaskModalOpen = ref(false)
 const longTaskInput = ref('')
+const wordUploadRef = ref(null)
 const selectedApproval = ref(null)
 const selectedDelivery = ref(null)
 const selectedEntity = ref(null)
@@ -789,6 +858,16 @@ const selectedEntityApprovals = computed(() => {
       item.runtimeNodeId === selectedEntitySourceId.value || item.runtimeNodeId === selectedEntity.value.id,
   )
 })
+const activeTaskFlowOwnerId = computed(() => {
+  if (selectedEntitySourceId.value && runtime.taskFlows[selectedEntitySourceId.value]) {
+    return selectedEntitySourceId.value
+  }
+  return currentPlacements.value.map((placement) => placement.id).find((id) => runtime.taskFlows[id]) || null
+})
+const activeTaskFlow = computed(() =>
+  activeTaskFlowOwnerId.value ? runtime.taskFlows[activeTaskFlowOwnerId.value] || null : null,
+)
+const taskFlowOverlay = ref({ lines: [] })
 const selectedEntityStreamText = computed(() => {
   if (!selectedEntity.value) return '\u65e0\u5b9e\u65f6\u8f93\u51fa'
   const sourceId = selectedEntitySourceId.value
@@ -853,10 +932,8 @@ function getFloorNumber(floorId) {
 }
 
 function setFloorButtonRef(floorId, el) {
-  const next = { ...floorButtonRefs.value }
-  if (el) next[floorId] = el
-  else delete next[floorId]
-  floorButtonRefs.value = next
+  if (el) floorButtonRefs[floorId] = el
+  else delete floorButtonRefs[floorId]
 }
 
 function setFloorCalloutPositionFromButton(buttonEl) {
@@ -872,7 +949,7 @@ function setFloorCalloutPositionFromButton(buttonEl) {
 }
 
 function updateFloorCalloutPosition() {
-  setFloorCalloutPositionFromButton(floorButtonRefs.value[currentFloorId.value])
+  setFloorCalloutPositionFromButton(floorButtonRefs[currentFloorId.value])
 }
 
 function scheduleFloorCalloutPositionUpdate() {
@@ -949,16 +1026,108 @@ function setPlacementStatus(placement, state, text) {
 function setWorkerBusyState(placement, isWorking, currentTask = '', streamedContent = null) {
   const keys = [...new Set([placement.id, placement.refId].filter(Boolean))]
   keys.forEach((key) => {
-    const workerState = runtime.ensureWorkerState(key)
-    workerState.isWorking = isWorking
-    if (currentTask) workerState.currentTask = currentTask
-    if (streamedContent !== null) workerState.streamedContent = streamedContent
+    runtime.patchWorkerState(key, {
+      isWorking,
+      ...(currentTask ? { currentTask } : {}),
+      ...(streamedContent !== null ? { streamedContent } : {}),
+    })
   })
 }
 
 function displayName(placement) {
   if (placement.kind === 'team') return store.teamMap[placement.refId]?.name || placement.name
   return store.employeeMap[placement.refId]?.name || placement.name
+}
+
+function escapeSelectorValue(value) {
+  return String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+function queryFlowAnchor(entityId) {
+  if (!viewportRef.value || !entityId) return null
+  const selectors = [
+    `[data-entity-id="${escapeSelectorValue(entityId)}"]`,
+    `[data-info-source-id="${escapeSelectorValue(entityId)}"]`,
+    `[data-ref-id="${escapeSelectorValue(entityId)}"]`,
+  ]
+  for (const selector of selectors) {
+    const node = viewportRef.value.querySelector(selector)
+    if (node) return node
+  }
+  return null
+}
+
+function getAnchorCenter(entityId) {
+  const viewportRect = viewportRef.value?.getBoundingClientRect()
+  const nodeRect = queryFlowAnchor(entityId)?.getBoundingClientRect()
+  if (!viewportRect || !nodeRect) return null
+  return {
+    x: nodeRect.left - viewportRect.left + nodeRect.width / 2,
+    y: nodeRect.top - viewportRect.top + nodeRect.height / 2,
+  }
+}
+
+function buildFlowPath(from, to) {
+  const midX = (from.x + to.x) / 2
+  return `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`
+}
+
+function lineColorClassForStatus(status) {
+  return (
+    {
+      done: 'text-emerald-500',
+      running: 'text-blue-500',
+      failed: 'text-rose-500',
+      ready: 'text-sky-300',
+      pending: 'text-slate-300',
+    }[status] || 'text-slate-300'
+  )
+}
+
+function rebuildTaskFlowOverlay() {
+  const flow = activeTaskFlow.value
+  if (!flow || !viewportRef.value) {
+    taskFlowOverlay.value = { lines: [] }
+    return
+  }
+
+  const nextLines = []
+  flow.taskOrder.forEach((taskId) => {
+    const task = flow.tasks?.[taskId]
+    if (!task?.assigneeId) return
+    const target = getAnchorCenter(task.assigneeId)
+    if (!target) return
+
+    const sources = task.dependsOn?.length
+      ? task.dependsOn.map((depId) => flow.tasks?.[depId]?.assigneeId).filter(Boolean)
+      : flow.rootId && flow.rootId !== task.assigneeId
+        ? [flow.rootId]
+        : []
+
+    sources.forEach((sourceId, index) => {
+      const source = getAnchorCenter(sourceId)
+      if (!source) return
+      nextLines.push({
+        id: `${task.id}-${sourceId}-${index}`,
+        path: buildFlowPath(source, target),
+        colorClass: lineColorClassForStatus(task.status),
+      })
+    })
+  })
+
+  taskFlowOverlay.value = { lines: nextLines }
+}
+
+function scheduleTaskFlowOverlayUpdate() {
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      rebuildTaskFlowOverlay()
+    })
+  })
+}
+
+function extractTaskIdFromTimelineMessage(message) {
+  return String(message || '').match(/\b(t\d+)\b/)?.[1] || null
 }
 
 function kindLabelForPlacement(placement) {
@@ -1000,6 +1169,9 @@ function getPlacementContext(placement) {
       workerPrompt: employee?.prompt || DEFAULT_WORKER_PROMPT,
       requireApproval: false,
       tools: employee?.tools || [],
+      activationType: employee?.activationType || 'text',
+      deliverableType: employee?.deliverableType || 'text',
+      executionMode: employee?.executionMode || 'llm',
     }
   }
 
@@ -1022,6 +1194,9 @@ function getPlacementContext(placement) {
       manager?.synthesizerPrompt || manager?.prompt || DEFAULT_MANAGER_SYNTHESIZER,
     requireApproval: manager ? manager.requireApproval !== false : false,
     tools: [...new Set(workers.flatMap((item) => item.tools || []))],
+    activationType: manager?.activationType || 'text',
+    deliverableType: manager?.deliverableType || 'text',
+    fixedPlan: manager?.fixedPlan || null,
   }
 }
 
@@ -1037,7 +1212,48 @@ function getManagedChildren(placement) {
 }
 
 function createTaskCard(title) {
-  return { id: crypto.randomUUID(), title }
+  return { id: crypto.randomUUID(), kind: 'text', title, text: title }
+}
+
+function createWordTaskCard(file, base64) {
+  return {
+    id: crypto.randomUUID(),
+    kind: 'word',
+    title: file.name,
+    fileName: file.name,
+    mimeType:
+      file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    base64,
+  }
+}
+
+function openWordUpload() {
+  wordUploadRef.value?.click?.()
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const value = String(reader.result || '')
+      resolve(value.includes(',') ? value.split(',').pop() : value)
+    }
+    reader.onerror = () => reject(reader.error || new Error('文件读取失败'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function handleWordUpload(event) {
+  const file = event.target?.files?.[0]
+  if (!file) return
+  try {
+    const base64 = await fileToBase64(file)
+    taskCards.value.unshift(createWordTaskCard(file, base64))
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : 'Word 文件读取失败')
+  } finally {
+    event.target.value = ''
+  }
 }
 
 function addQuickTask() {
@@ -1068,14 +1284,22 @@ function restoreTaskCard(taskCard) {
   taskCards.value.unshift(taskCard)
 }
 
-function recordDelivery({ sender, task, result, sourceTaskId = '', sourcePlanId = '' }) {
-  runtime.addDelivery({ sender, task, result })
+function recordDelivery({
+  sender,
+  task,
+  result,
+  sourceTaskId = '',
+  sourcePlanId = '',
+  deliverable = null,
+}) {
+  runtime.addDelivery({ sender, task, result, deliverable })
   assetLibrary.registerDeliverable({
     title: task,
     result,
     sender,
     sourceTaskId,
     sourcePlanId,
+    deliverable,
   })
 }
 
@@ -1124,7 +1348,25 @@ function dropTaskToPlacement(placement) {
   dragTask.value = ''
 }
 
+function matchesActivationType(placement, taskCard) {
+  const context = getPlacementContext(placement)
+  return (taskCard?.kind || 'text') === (context.activationType || 'text')
+}
+
+function getTaskInputRejectionText(placement, taskCard) {
+  const context = getPlacementContext(placement)
+  const required = context.activationType === 'word' ? 'Word 文件' : '任务描述'
+  const received = taskCard?.kind === 'word' ? 'Word 文件' : '任务描述'
+  return `[${displayName(placement)}] 只能接收${required}，当前拖入的是${received}。`
+}
+
 function assignTask(placement, taskCard) {
+  if (!matchesActivationType(placement, taskCard)) {
+    const message = getTaskInputRejectionText(placement, taskCard)
+    runtime.log('sys', message, { entityId: placement.id })
+    window.alert(message)
+    return
+  }
   runtime.ensureTeamQueue(placement.id)
   runtime.enqueueTask(placement.id, taskCard.title, {
     placementId: placement.id,
@@ -1152,7 +1394,7 @@ async function processQueue(placement) {
   const context = getPlacementContext(placement)
 
   if (context.role === 'manager' && context.requireApproval) {
-    const success = await generateApprovalDraft(placement, current.task)
+    const success = await generateApprovalDraft(placement, current.task, '', current.payload?.sourceTask || null)
     if (!success && (runtime.teamQueues[placement.id] || []).length) {
       processQueue(placement)
     }
@@ -1174,6 +1416,7 @@ async function rejectApproval(approval) {
     approval.nodeSnapshot,
     approval.task,
     approval.feedback || '\u8bf7\u6309 Boss \u610f\u89c1\u91cd\u65b0\u62c6\u89e3',
+    approval.sourceTask || null,
   )
 }
 
@@ -1183,21 +1426,24 @@ async function submitReject(approval) {
 }
 
 async function approveApproval(approval) {
-  const children = getManagedChildren(approval.nodeSnapshot)
-  const validationError = validateApprovalPlan(approval.plan, children)
+  if (!approval) return
+  const approvalSnapshot = cloneValue(approval)
+  if (!approvalSnapshot?.nodeSnapshot) return
+  const children = getManagedChildren(approvalSnapshot.nodeSnapshot)
+  const validationError = validateApprovalPlan(approvalSnapshot.plan, children)
   if (validationError) {
     window.alert(`审批内容仍不合法：${validationError}`)
     return
   }
 
-  approval.draft = renderApprovalPlan(approval.plan)
+  approvalSnapshot.draft = renderApprovalPlan(approvalSnapshot.plan)
+  runtime.resolveApproval(approvalSnapshot.id)
   closeApprovalModal()
-  runtime.resolveApproval(approval.id)
-  await executeTask(approval.nodeSnapshot, approval.task, approval.draft, {
+  await executeTask(approvalSnapshot.nodeSnapshot, approvalSnapshot.task, approvalSnapshot.draft, {
     queued: true,
     deliverToBoss: true,
-    sourceTask: approval.sourceTask,
-    approvedPlan: approval.plan || null,
+    sourceTask: approvalSnapshot.sourceTask,
+    approvedPlan: approvalSnapshot.plan || null,
   })
 }
 
@@ -1299,7 +1545,59 @@ function toggleApprovalDependency(task, depId) {
   task.dependsOn = [...current]
 }
 
-async function generateApprovalDraft(placement, task, feedback = '') {
+function replaceTaskTemplatePlaceholders(value, replacements) {
+  if (typeof value === 'string') {
+    return value.replace(/\{\{\s*(taskTitle|task|fileName)\s*\}\}/g, (_, key) => replacements[key] || '')
+  }
+  if (Array.isArray(value)) return value.map((item) => replaceTaskTemplatePlaceholders(item, replacements))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, replaceTaskTemplatePlaceholders(item, replacements)]),
+    )
+  }
+  return value
+}
+
+function buildFixedPlanForPlacement(placement, task, sourceTask, fixedPlan) {
+  if (!fixedPlan?.tasks?.length) return null
+  const replacements = {
+    taskTitle: task,
+    task,
+    fileName: sourceTask?.fileName || task,
+  }
+  const children = getManagedChildren(placement)
+  const tasks = fixedPlan.tasks
+    .map((item, index) => {
+      const resolved = replaceTaskTemplatePlaceholders(cloneValue(item), replacements)
+      const matched =
+        children.find((child) => String(child.id) === String(resolved.assigneeId)) ||
+        children.find((child) => String(child.refId) === String(resolved.assigneeRefId))
+      if (!matched) return null
+      return {
+        id: resolved.id || `t${index + 1}`,
+        title: resolved.title || `子任务 ${index + 1}`,
+        assigneeId: matched.id,
+        assigneeName: displayName(matched),
+        task: resolved.task || '',
+        dependsOn: normalizeDependencyList(resolved.dependsOn),
+        reason: resolved.reason || '',
+      }
+    })
+    .filter(Boolean)
+
+  return {
+    summary:
+      replaceTaskTemplatePlaceholders(fixedPlan.summary || `执行任务：${task}`, replacements) || `执行任务：${task}`,
+    deliverable:
+      replaceTaskTemplatePlaceholders(fixedPlan.deliverable || `完成“${task}”的交付结果`, replacements) ||
+      `完成“${task}”的交付结果`,
+    tasks,
+    risks: Array.isArray(fixedPlan.risks) ? fixedPlan.risks : [],
+    openQuestions: Array.isArray(fixedPlan.openQuestions) ? fixedPlan.openQuestions : [],
+  }
+}
+
+async function generateApprovalDraft(placement, task, feedback = '', sourceTask = null) {
   const context = getPlacementContext(placement)
   setPlacementStatus(placement, 'working', '\u6b63\u5728\u751f\u6210\u62c6\u89e3')
   runtime.log(
@@ -1311,8 +1609,14 @@ async function generateApprovalDraft(placement, task, feedback = '') {
   const children = getManagedChildren(placement)
   const childRoster = formatSubordinateRoster(children)
   const planningGuidance = getTaskPlanningGuidance(task, children)
+  let plan = null
+  if (context.fixedPlan?.tasks?.length) {
+    plan = buildFixedPlanForPlacement(placement, task, sourceTask, context.fixedPlan)
+  }
 
-  const rawPlan = await runtime.runWorkerTask({
+  const rawPlan = plan
+    ? null
+    : await runtime.runWorkerTask({
     workerKey: placement.id,
     workerName: context.workerName,
     systemPrompt: context.plannerPrompt,
@@ -1349,7 +1653,7 @@ ${childRoster}
 5. 如果直属下属不足以完成任务，也要输出合法 JSON，并在 risks / openQuestions 里明确说明`,
   })
 
-  const plan = extractJsonObjectPayload(rawPlan)
+  plan = plan || extractJsonObjectPayload(rawPlan)
   const validationError = validateApprovalPlan(plan, children)
   if (validationError) {
     runtime.log('mgr', `[${context.workerName}] 拆解计划校验失败：${validationError}`, {
@@ -1385,7 +1689,7 @@ ${childRoster}
     task,
     managerName: context.workerName,
     nodeSnapshot: cloneValue(placement),
-    sourceTask: runtime.teamQueues[placement.id]?.[0]?.payload?.sourceTask || null,
+    sourceTask: sourceTask || runtime.teamQueues[placement.id]?.[0]?.payload?.sourceTask || null,
     draft,
     plan,
   })
@@ -1726,6 +2030,53 @@ function buildBackendExecutionPlan(placement, task, approvedPlan) {
   }
 }
 
+function getWorkerConfigForPlacement(placement) {
+  if (placement.kind === 'employee') {
+    const employee = store.employeeMap[placement.refId]
+    return employee
+      ? {
+          name: employee.name,
+          prompt: employee.prompt || DEFAULT_WORKER_PROMPT,
+          activationType: employee.activationType || 'text',
+          deliverableType: employee.deliverableType || 'text',
+          executionMode: employee.executionMode || 'llm',
+          tools: employee.tools || [],
+        }
+      : null
+  }
+
+  const manager = getManagerEntity(placement)
+  return manager
+    ? {
+        name: manager.name,
+        prompt: manager.prompt || manager.plannerPrompt || DEFAULT_MANAGER_PLANNER,
+        activationType: manager.activationType || 'text',
+        deliverableType: manager.deliverableType || 'text',
+        executionMode: manager.executionMode || 'llm',
+        tools: manager.tools || [],
+      }
+    : null
+}
+
+function buildAssigneeConfigMap(placement, executionPlan) {
+  const configMap = {}
+  if (placement.kind === 'employee') {
+    const config = getWorkerConfigForPlacement(placement)
+    if (config) configMap[String(placement.id)] = config
+    return configMap
+  }
+
+  const childMap = new Map(getManagedChildren(placement).map((child) => [String(child.id), child]))
+  ;(executionPlan?.tasks || []).forEach((taskItem) => {
+    const matched = childMap.get(String(taskItem.assigneeId))
+    if (!matched) return
+    const config = getWorkerConfigForPlacement(matched)
+    if (!config) return
+    configMap[String(taskItem.assigneeId)] = config
+  })
+  return configMap
+}
+
 function appendBackendTimeline(placement, timeline = []) {
   timeline.forEach((entry) => {
     const role = entry.stage === 'received' ? 'sys' : entry.stage.includes('worker') ? 'wrk' : 'mgr'
@@ -1747,10 +2098,11 @@ function handleRuntimeStreamEvent(placement, eventName, payload = {}) {
   if (eventName === 'chunk') {
     const stage = payload.stage || 'worker'
     if (stage === 'synthesizer') {
-      const workerState = runtime.ensureWorkerState(`${placement.id}:synthesis`)
-      workerState.streamedContent = payload.fullText || ''
-      workerState.isWorking = true
-      workerState.currentTask = taskLabelForStream(stage, payload)
+      runtime.patchWorkerState(`${placement.id}:synthesis`, {
+        streamedContent: payload.fullText || '',
+        isWorking: true,
+        currentTask: taskLabelForStream(stage, payload),
+      })
     } else {
       setWorkerBusyState(placement, true, taskLabelForStream(stage, payload), payload.fullText || '')
     }
@@ -1769,8 +2121,10 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
   const context = getPlacementContext(placement)
   setPlacementStatus(placement, 'working', '\u4efb\u52a1\u6267\u884c\u4e2d')
   setWorkerBusyState(placement, true, task, '')
-  runtime.ensureWorkerState(`${placement.id}:synthesis`).streamedContent = ''
-  runtime.ensureWorkerState(`${placement.id}:synthesis`).isWorking = false
+  runtime.patchWorkerState(`${placement.id}:synthesis`, {
+    streamedContent: '',
+    isWorking: false,
+  })
 
   let result = ''
 
@@ -1780,6 +2134,7 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
     }
 
     const executionPlan = buildBackendExecutionPlan(placement, task, approvedPlan)
+    const assigneeConfigs = buildAssigneeConfigMap(placement, executionPlan)
     const runtimeResult = await executeRuntimeTask({
       token: authStore.authToken,
       task,
@@ -1789,6 +2144,19 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
       context: {
         role: context.role,
         approvedDraft,
+        taskInput:
+          sourceTask || {
+            id: `task-${crypto.randomUUID()}`,
+            kind: 'text',
+            title: task,
+            text: task,
+          },
+        managerConfig: {
+          activationType: context.activationType || 'text',
+          deliverableType: context.deliverableType || 'text',
+          fixedPlan: context.fixedPlan || null,
+        },
+        assigneeConfigs,
       },
       onEvent: ({ event, payload }) => handleRuntimeStreamEvent(placement, event, payload),
     })
@@ -1800,6 +2168,7 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
         task,
         result,
         sourcePlanId: runtimeResult.plan?.id || '',
+        deliverable: runtimeResult.finalDeliverable || null,
       })
     }
   } catch (error) {
@@ -1807,7 +2176,9 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
   }
 
   setWorkerBusyState(placement, false)
-  runtime.ensureWorkerState(`${placement.id}:synthesis`).isWorking = false
+  runtime.patchWorkerState(`${placement.id}:synthesis`, {
+    isWorking: false,
+  })
 
   if (queued) {
     if (isExecutionError(result)) {
@@ -1974,11 +2345,14 @@ watch(
   { deep: true },
 )
 
+watch(currentFloorId, () => {
+  scheduleFloorCalloutPositionUpdate()
+})
+
 watch(
-  [currentFloorId, floorButtons],
+  () => store.floors.map((floor) => floor.id).join('|'),
   () => {
     scheduleFloorCalloutPositionUpdate()
   },
-  { deep: true, flush: 'post' },
 )
 </script>

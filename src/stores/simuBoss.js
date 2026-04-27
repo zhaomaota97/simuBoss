@@ -22,6 +22,69 @@ function normalizeFloorName(name, fallback = TEXT.newFloorName) {
   return cleaned || fallback
 }
 
+function normalizeActivationType(value) {
+  return value === 'word' ? 'word' : 'text'
+}
+
+function normalizeDeliverableType(value) {
+  return value === 'ppt' ? 'ppt' : 'text'
+}
+
+function normalizeExecutionMode(value) {
+  return value === 'ppt_renderer' ? 'ppt_renderer' : 'llm'
+}
+
+function normalizeFixedPlan(value) {
+  if (!value || typeof value !== 'object') return null
+  const tasks = Array.isArray(value.tasks) ? value.tasks : []
+  return {
+    summary: String(value.summary || '').trim(),
+    deliverable: String(value.deliverable || '').trim(),
+    tasks: tasks.map((task, index) => ({
+      id: String(task.id || `t${index + 1}`).trim() || `t${index + 1}`,
+      title: String(task.title || '').trim(),
+      assigneeId: String(task.assigneeId || '').trim(),
+      assigneeRefId: String(task.assigneeRefId || '').trim(),
+      assigneeName: String(task.assigneeName || '').trim(),
+      task: String(task.task || '').trim(),
+      dependsOn: Array.isArray(task.dependsOn)
+        ? task.dependsOn.map((item) => String(item || '').trim()).filter(Boolean)
+        : [],
+      reason: String(task.reason || '').trim(),
+    })),
+    risks: Array.isArray(value.risks)
+      ? value.risks.map((item) => String(item || '').trim()).filter(Boolean)
+      : [],
+    openQuestions: Array.isArray(value.openQuestions)
+      ? value.openQuestions.map((item) => String(item || '').trim()).filter(Boolean)
+      : [],
+  }
+}
+
+function sanitizeEmployeePayload(payload = {}) {
+  return {
+    ...payload,
+    locked: Boolean(payload.locked),
+    hidden: Boolean(payload.hidden),
+    source: payload.source || 'local',
+    activationType: normalizeActivationType(payload.activationType),
+    deliverableType: normalizeDeliverableType(payload.deliverableType),
+    executionMode: normalizeExecutionMode(payload.executionMode),
+    fixedPlan: normalizeFixedPlan(payload.fixedPlan),
+  }
+}
+
+function sanitizeTeamPayload(payload = {}) {
+  return {
+    ...payload,
+    locked: Boolean(payload.locked),
+    source: payload.source || 'local',
+    bundledEmployeeIds: Array.isArray(payload.bundledEmployeeIds)
+      ? [...payload.bundledEmployeeIds]
+      : [],
+  }
+}
+
 const DEFAULT_EMPS = [
   {
     id: 101,
@@ -33,6 +96,9 @@ const DEFAULT_EMPS = [
     prompt: SEED_ROLE_PROMPTS.workers.research,
     temperature: 0.3,
     maxTokens: 4096,
+    activationType: 'text',
+    deliverableType: 'text',
+    executionMode: 'llm',
   },
   {
     id: 102,
@@ -44,6 +110,9 @@ const DEFAULT_EMPS = [
     prompt: SEED_ROLE_PROMPTS.workers.writing,
     temperature: 0.7,
     maxTokens: 8192,
+    activationType: 'text',
+    deliverableType: 'text',
+    executionMode: 'llm',
   },
   {
     id: 103,
@@ -55,6 +124,9 @@ const DEFAULT_EMPS = [
     prompt: SEED_ROLE_PROMPTS.workers.design,
     temperature: 0.5,
     maxTokens: 4096,
+    activationType: 'text',
+    deliverableType: 'text',
+    executionMode: 'llm',
   },
   {
     id: 104,
@@ -66,6 +138,9 @@ const DEFAULT_EMPS = [
     prompt: SEED_ROLE_PROMPTS.workers.frontend,
     temperature: 0.2,
     maxTokens: 8192,
+    activationType: 'text',
+    deliverableType: 'text',
+    executionMode: 'llm',
   },
   {
     id: 105,
@@ -77,6 +152,9 @@ const DEFAULT_EMPS = [
     prompt: SEED_ROLE_PROMPTS.workers.backend,
     temperature: 0.2,
     maxTokens: 8192,
+    activationType: 'text',
+    deliverableType: 'text',
+    executionMode: 'llm',
   },
   {
     id: 106,
@@ -88,6 +166,9 @@ const DEFAULT_EMPS = [
     prompt: SEED_ROLE_PROMPTS.workers.qa,
     temperature: 0.2,
     maxTokens: 4096,
+    activationType: 'text',
+    deliverableType: 'text',
+    executionMode: 'llm',
   },
   {
     id: 107,
@@ -99,6 +180,9 @@ const DEFAULT_EMPS = [
     prompt: SEED_ROLE_PROMPTS.workers.analysis,
     temperature: 0.3,
     maxTokens: 4096,
+    activationType: 'text',
+    deliverableType: 'text',
+    executionMode: 'llm',
   },
   {
     id: 108,
@@ -110,6 +194,9 @@ const DEFAULT_EMPS = [
     prompt: SEED_ROLE_PROMPTS.workers.operations,
     temperature: 0.4,
     maxTokens: 4096,
+    activationType: 'text',
+    deliverableType: 'text',
+    executionMode: 'llm',
   },
   {
     id: 201,
@@ -124,6 +211,8 @@ const DEFAULT_EMPS = [
     temperature: 0.6,
     maxTokens: 4096,
     requireApproval: true,
+    activationType: 'text',
+    deliverableType: 'text',
   },
   {
     id: 202,
@@ -138,6 +227,8 @@ const DEFAULT_EMPS = [
     temperature: 0.5,
     maxTokens: 4096,
     requireApproval: true,
+    activationType: 'text',
+    deliverableType: 'text',
   },
   {
     id: 203,
@@ -152,6 +243,8 @@ const DEFAULT_EMPS = [
     temperature: 0.7,
     maxTokens: 4096,
     requireApproval: true,
+    activationType: 'text',
+    deliverableType: 'text',
   },
 ]
 
@@ -311,7 +404,7 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
 
   function upsertEmployee(payload, editingId = null) {
     const isManager = payload.role === 'manager'
-    const value = {
+    const value = sanitizeEmployeePayload({
       ...payload,
       id: editingId ?? nextId(),
       prompt:
@@ -323,7 +416,11 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
         isManager ? payload.synthesizerPrompt || payload.prompt || '' : '',
       tools: payload.role === 'worker' ? payload.tools || [] : [],
       requireApproval: isManager ? payload.requireApproval !== false : undefined,
-    }
+      activationType: normalizeActivationType(payload.activationType),
+      deliverableType: normalizeDeliverableType(payload.deliverableType),
+      executionMode: payload.role === 'worker' ? normalizeExecutionMode(payload.executionMode) : 'llm',
+      fixedPlan: isManager ? normalizeFixedPlan(payload.fixedPlan) : null,
+    })
 
     if (editingId) {
       const index = employees.value.findIndex((item) => item.id === editingId)
@@ -353,16 +450,19 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
     const value = cloneDeep(source)
     value.id = nextId()
     value.name = `${value.name}${TEXT.cloneSuffix}`
+    value.locked = false
+    value.hidden = false
+    value.source = 'local'
     employees.value.push(value)
     return value.id
   }
 
   function upsertTeam(payload, editingId = null) {
-    const value = {
+    const value = sanitizeTeamPayload({
       ...payload,
       id: editingId ?? nextId(),
       desc: getTeamDesc(payload.members || [], employees.value, teams.value),
-    }
+    })
 
     if (editingId) {
       const index = teams.value.findIndex((item) => item.id === editingId)
@@ -375,7 +475,12 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
   }
 
   function deleteTeam(id) {
+    const team = teams.value.find((item) => item.id === id)
     teams.value = teams.value.filter((item) => item.id !== id)
+    if (team?.bundledEmployeeIds?.length) {
+      const bundledIds = new Set(team.bundledEmployeeIds)
+      employees.value = employees.value.filter((item) => !bundledIds.has(item.id))
+    }
     Object.keys(canvasLayouts.value).forEach((floorId) => {
       canvasLayouts.value[floorId] = (canvasLayouts.value[floorId] || []).filter(
         (node) => !(node.kind === 'team' && node.refId === id),
@@ -392,11 +497,127 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
     const source = teams.value.find((item) => item.id === id)
     if (!source) return null
     const value = cloneDeep(source)
+
+    if (value.bundledEmployeeIds?.length) {
+      const employeeIdMap = new Map()
+      value.bundledEmployeeIds.forEach((employeeId) => {
+        const employee = employees.value.find((item) => item.id === employeeId)
+        if (!employee) return
+        const clonedEmployeeId = nextId()
+        employeeIdMap.set(employeeId, clonedEmployeeId)
+        employees.value.push({
+          ...cloneDeep(employee),
+          id: clonedEmployeeId,
+          name: `${employee.name}${TEXT.cloneSuffix}`,
+          locked: false,
+          hidden: false,
+          source: 'local',
+        })
+      })
+
+      function remapNodes(nodes) {
+        return (nodes || []).map((node) => ({
+          ...cloneDeep(node),
+          refId:
+            node.type === 'emp_ref' && employeeIdMap.has(node.refId)
+              ? employeeIdMap.get(node.refId)
+              : node.refId,
+          children: remapNodes(node.children || []),
+        }))
+      }
+
+      value.members = remapNodes(value.members || [])
+      value.bundledEmployeeIds = [...employeeIdMap.values()]
+    }
+
     value.id = nextId()
     value.name = `${value.name}${TEXT.cloneSuffix}`
+    value.locked = false
+    value.source = 'local'
     value.desc = getTeamDesc(value.members || [], employees.value, teams.value)
     teams.value.push(value)
     return value.id
+  }
+
+  function ensurePresetTeam(payload) {
+    const existing = teams.value.find((item) => item.name === payload.name)
+    if (existing) return existing.id
+
+    const value = sanitizeTeamPayload({
+      ...payload,
+      id: nextId(),
+      members: cloneDeep(payload.members || []),
+    })
+    value.desc = getTeamDesc(value.members || [], employees.value, teams.value) || payload.desc || ''
+    teams.value.push(value)
+    return value.id
+  }
+
+  function recruitPresetTeamBundle(bundle, options = {}) {
+    const teamName = String(bundle?.team?.name || '').trim()
+    if (!teamName) return null
+
+    const existing = teams.value.find((item) => item.name === teamName)
+    if (existing) return existing.id
+
+    const recruitMembers = options.recruitMembers !== false
+    const employeeIdMap = new Map()
+    const bundledEmployeeIds = []
+
+    for (const presetEmployee of bundle.employees || []) {
+      const newId = nextId()
+      employeeIdMap.set(String(presetEmployee.tempId), newId)
+      bundledEmployeeIds.push(newId)
+      employees.value.push(
+        sanitizeEmployeePayload({
+          ...cloneDeep(presetEmployee),
+          id: newId,
+          locked: !recruitMembers,
+          hidden: !recruitMembers,
+          source: 'market',
+        }),
+      )
+    }
+
+    employees.value = employees.value.map((employee) => {
+      if (!bundledEmployeeIds.includes(employee.id) || !employee.fixedPlan?.tasks?.length) return employee
+      return sanitizeEmployeePayload({
+        ...employee,
+        fixedPlan: {
+          ...employee.fixedPlan,
+          tasks: employee.fixedPlan.tasks.map((task) => ({
+            ...task,
+            assigneeRefId: employeeIdMap.has(String(task.assigneeRefId))
+              ? employeeIdMap.get(String(task.assigneeRefId))
+              : task.assigneeRefId,
+            assigneeId: employeeIdMap.has(String(task.assigneeId))
+              ? employeeIdMap.get(String(task.assigneeId))
+              : task.assigneeId,
+          })),
+        },
+      })
+    })
+
+    function remapNodes(nodes) {
+      return (nodes || []).map((node) => ({
+        ...cloneDeep(node),
+        refId:
+          node.type === 'emp_ref' && employeeIdMap.has(String(node.refId))
+            ? employeeIdMap.get(String(node.refId))
+            : node.refId,
+        children: remapNodes(node.children || []),
+      }))
+    }
+
+    const teamPayload = sanitizeTeamPayload({
+      ...cloneDeep(bundle.team),
+      members: remapNodes(bundle.team.members || []),
+      locked: !recruitMembers,
+      source: 'market',
+      bundledEmployeeIds,
+    })
+
+    return upsertTeam(teamPayload)
   }
 
   function addFloor(name = null) {
@@ -519,6 +740,8 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
     upsertTeam,
     deleteTeam,
     cloneTeam,
+    ensurePresetTeam,
+    recruitPresetTeamBundle,
     addFloor,
     updateFloorName,
     getFloorDisplayName,

@@ -24,10 +24,18 @@
         </RouterLink>
       </nav>
 
+      <button
+        type="button"
+        class="ml-auto inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-white/30 hover:text-white"
+        @click="resetSandbox"
+      >
+        开发重置
+      </button>
+
       <DropdownMenu v-model:open="accountMenuOpen">
         <DropdownMenuTrigger>
           <button
-            class="ml-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:border-white/30 hover:text-white"
+            class="ml-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:border-white/30 hover:text-white"
           >
             <span
               class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500/20 text-[11px] font-semibold text-white"
@@ -70,11 +78,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
+import { useAssetLibraryStore } from './stores/assetLibrary'
 import { useAuthStore } from './stores/auth'
+import { useRuntimeStore } from './stores/runtime'
+import { useSimuBossStore } from './stores/simuBoss'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const simuBossStore = useSimuBossStore()
+const runtimeStore = useRuntimeStore()
+const assetLibraryStore = useAssetLibraryStore()
+
 const accountMenuOpen = ref(false)
 const loggingOut = ref(false)
 
@@ -97,5 +112,18 @@ async function logout() {
   await authStore.logout()
   loggingOut.value = false
   router.replace('/login')
+}
+
+function resetSandbox() {
+  const confirmed = window.confirm(
+    '确认还原员工、团队、公司大楼、运行态和资产库到初始状态吗？',
+  )
+  if (!confirmed) return
+
+  simuBossStore.resetSeedData()
+  runtimeStore.clearRuntime()
+  assetLibraryStore.resetAssets()
+  router.replace('/')
+  window.location.reload()
 }
 </script>

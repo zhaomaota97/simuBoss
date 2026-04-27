@@ -1,682 +1,800 @@
 <template>
-  <div class="flex h-full min-h-0 gap-5 p-5">
-    <section class="panel flex min-h-0 min-w-0 flex-[1.35] flex-col">
-      <div class="panel-header">
-        <span>团队中心</span>
-        <button class="rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-white" @click="openTeamStudio()">
+  <div class="flex h-full min-h-0 bg-slate-100 text-slate-900">
+    <section class="w-[320px] border-r border-slate-200 bg-white p-4">
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div class="text-lg font-semibold">团队中心</div>
+        <p class="mt-2 text-xs leading-5 text-slate-500">
+          这里直接在中间画布查看或编辑团队结构。保存时会自动校验 leader 规则。
+        </p>
+        <button
+          class="mt-4 w-full rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white"
+          @click="createTeam"
+        >
           + 编排新团队
         </button>
       </div>
-      <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4">
+
+      <div class="mt-4 space-y-3">
         <div
-          v-if="!store.teams.length"
-          class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center text-sm text-slate-400"
+          v-for="team in visibleTeams"
+          :key="team.id"
+          class="rounded-2xl border px-4 py-3 shadow-sm transition cursor-pointer"
+          :class="
+            selectedTeamId === team.id
+              ? 'border-brand-500 bg-brand-50 text-brand-700'
+              : 'border-slate-200 bg-white hover:bg-slate-50'
+          "
+          @click="openTeam(team.id, 'view')"
         >
-          还没有团队，先把经理和员工组织起来吧。
-        </div>
-        <div v-for="team in store.teams" :key="team.id" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 last:mb-0">
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex items-center gap-3">
-              <AvatarBadge :icon="team.icon" :label="team.name" :size="44" rounded="xl" />
-              <div>
+          <div class="flex items-start gap-3">
+            <AvatarBadge :icon="team.icon" :label="team.name" :size="42" rounded="xl" />
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
                 <div class="text-sm font-semibold text-slate-800">{{ team.name }}</div>
-                <div class="mt-1 text-xs text-slate-500">{{ getTeamDesc(team.members, store.employees, store.teams) }}</div>
+                <span
+                  v-if="team.locked"
+                  class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+                >
+                  市场样板
+                </span>
+              </div>
+              <div class="mt-1 text-xs text-slate-500">
+                {{ getTeamDesc(team.members, store.employees, store.teams) }}
               </div>
             </div>
-            <div class="flex items-center gap-2 text-xs">
-              <button class="rounded-md px-2 py-1 text-brand-600 hover:bg-brand-50" @click="openTeamStudio(team.id)">编辑结构</button>
-              <button class="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100" @click="store.cloneTeam(team.id)">克隆</button>
-              <button class="rounded-md px-2 py-1 text-rose-500 hover:bg-rose-50" @click="store.deleteTeam(team.id)">删除</button>
-            </div>
+          </div>
+          <div class="mt-3 flex items-center gap-2 text-xs">
+            <button class="rounded-md px-2 py-1 text-brand-600 hover:bg-brand-50" @click.stop="openTeam(team.id, 'edit')">
+              编辑结构
+            </button>
+            <button class="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100" @click.stop="store.cloneTeam(team.id)">
+              克隆
+            </button>
+            <button class="rounded-md px-2 py-1 text-rose-500 hover:bg-rose-50" @click.stop="deleteTeam(team.id)">
+              删除
+            </button>
           </div>
         </div>
       </div>
     </section>
 
-    <aside class="panel flex min-h-0 w-[360px] flex-col">
-      <div class="panel-header">
-        <span>招募推荐</span>
-      </div>
-      <div class="scrollbar-thin flex-1 overflow-y-auto p-4">
-        <div class="mb-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
-          这里先作为团队招募推荐位使用。点任意卡片会直接跳到“招募员工”页面里的团队市场。
-        </div>
-        <div class="space-y-3">
-          <RouterLink
-            v-for="team in presetTeams"
-            :key="team.name"
-            class="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300"
-            to="/market?tab=team"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 flex-1">
-                <div class="text-sm font-semibold text-slate-900">{{ team.name }}</div>
-                <div class="mt-2 text-xs leading-5 text-slate-500">{{ team.desc }}</div>
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <span
-                    v-for="tag in team.tags"
-                    :key="tag"
-                    class="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-medium text-brand-700"
-                  >
-                    {{ tag }}
-                  </span>
-                </div>
-              </div>
-              <div class="rounded-2xl bg-slate-950 px-3 py-2 text-[11px] font-semibold tracking-[0.18em] text-white">
-                TEAM
-              </div>
+    <main class="flex min-w-0 flex-1 flex-col">
+      <div class="border-b border-slate-200 bg-white px-6 py-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex min-w-[320px] items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div class="border-r border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500">
+              团队
             </div>
-          </RouterLink>
-        </div>
-      </div>
-    </aside>
-
-    <div v-if="teamStudioOpen" class="fixed inset-0 z-50 bg-slate-950/70">
-      <div class="flex h-full w-full bg-slate-100 text-slate-900">
-        <aside class="w-[280px] border-r border-slate-200 bg-white p-4">
-          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div class="text-lg font-semibold">团队中心</div>
-            <p class="mt-2 text-xs leading-5 text-slate-500">
-              一个团队只能有一个根节点。可以把经理、员工或团队引用拖进中间画布，并继续往经理节点里挂下属。
-            </p>
+            <input
+              v-model="teamForm.name"
+              :disabled="currentMode !== 'edit'"
+              class="min-w-0 flex-1 px-3 py-2 text-sm font-medium outline-none disabled:bg-slate-50"
+              placeholder="团队名称"
+            />
           </div>
 
-          <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="mb-3 text-xs font-semibold tracking-[0.18em] text-slate-400">团队信息</div>
-            <div class="space-y-3">
+          <button
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium"
+            @click="discardDraft"
+            :disabled="currentMode !== 'edit'"
+          >
+            放弃更改
+          </button>
+          <button
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium"
+            @click="clearCurrentTeam"
+            :disabled="currentMode !== 'edit' || !draftAssignments.length"
+          >
+            清空团队
+          </button>
+          <button
+            class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-300"
+            @click="saveTeam"
+            :disabled="currentMode !== 'edit'"
+          >
+            保存团队结构
+          </button>
+          <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            {{ currentMode === 'edit' ? '编辑模式' : '查看模式' }}
+          </div>
+          <div class="ml-auto flex items-center gap-2">
+            <button
+              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600"
+              @click="focusContent"
+            >
+              定位到内容
+            </button>
+            <div class="text-xs text-slate-500">缩放 {{ Math.round(view.scale * 100) }}%</div>
+          </div>
+        </div>
+        <div v-if="saveError" class="mt-3 text-xs text-rose-600">{{ saveError }}</div>
+      </div>
+
+      <div class="flex min-h-0 flex-1">
+        <section class="flex min-w-0 flex-1 flex-col overflow-hidden p-4">
+          <div class="mb-3 flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold text-slate-800">画布</div>
+              <div class="mt-1 text-xs text-slate-500">
+                {{ currentMode === 'edit' ? '空白区域可平移，滚轮只做小幅缩放。' : '查看模式下仅浏览团队结构。' }}
+              </div>
+            </div>
+          </div>
+
+          <div
+            ref="viewportRef"
+            class="relative min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white"
+            @mousedown="startPan"
+            @dragover.prevent="currentMode === 'edit'"
+            @drop="currentMode === 'edit' && handleRootDrop($event)"
+            @wheel.prevent="handleWheel"
+          >
+            <div class="absolute inset-0" :style="worldStyle">
+              <div
+                class="relative bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1.2px,transparent_0)] bg-[length:24px_24px] bg-white"
+                :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
+              >
+                <div ref="canvasContentRef" class="absolute inset-0" :style="canvasOffsetStyle">
+                  <PlacementNode
+                    v-for="placement in draftAssignments"
+                    :key="placement.id"
+                    :placement="placement"
+                    :mode="currentMode === 'edit' ? 'edit' : 'runtime'"
+                    absolute
+                    @remove="currentMode === 'edit' && removePlacement($event)"
+                    @drop-into="currentMode === 'edit' && dropIntoNode($event)"
+                    @start-move="currentMode === 'edit' && startRootMove($event)"
+                  />
+                </div>
+
+                <div
+                  v-if="!draftAssignments.length"
+                  class="pointer-events-none absolute inset-0 flex items-center justify-center text-center text-slate-400"
+                >
+                  <div>
+                    <div class="text-lg font-semibold">还没有团队结构</div>
+                    <div class="mt-2 text-sm">
+                      {{ currentMode === 'edit' ? '把右侧的经理、员工或团队拖进来就行。' : '请选择一个团队查看，或点击左侧新建。' }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="flex min-h-0 w-[320px] flex-col border-l border-slate-200 bg-white p-4">
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div class="text-sm font-semibold">{{ currentMode === 'edit' ? '组件' : '团队信息' }}</div>
+            <div class="mt-1 text-xs leading-5 text-slate-500">
+              {{
+                currentMode === 'edit'
+                  ? '和公司大楼一样，从右侧拖拽团队、经理或员工到画布。'
+                  : '查看模式下只展示当前团队概况。'
+              }}
+            </div>
+          </div>
+
+          <div class="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+              <div class="mb-2 text-xs font-semibold tracking-[0.18em] text-slate-400">团队信息</div>
               <label class="block">
                 <div class="mb-1 text-xs font-medium text-slate-500">团队图标</div>
                 <input
                   v-model="teamForm.icon"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                  :disabled="currentMode !== 'edit'"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none disabled:bg-slate-50"
                 />
               </label>
-              <label class="block">
-                <div class="mb-1 text-xs font-medium text-slate-500">团队名称</div>
-                <input
-                  v-model="teamForm.name"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
-                />
-              </label>
-            </div>
-          </div>
-
-          <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-            <div class="mb-3 text-xs font-semibold tracking-[0.18em] text-slate-400">当前结构</div>
-            <div v-if="studioRootResolved" class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-3">
-              <AvatarBadge :icon="studioRootResolved.icon" :label="studioRootResolved.name" :size="40" rounded="xl" />
-              <div class="min-w-0">
-                <div class="truncate text-sm font-semibold text-slate-800">{{ studioRootResolved.name }}</div>
-                <div class="mt-1 text-xs text-slate-500">
-                  {{ studioRootResolved.role === 'manager' ? '经理根节点' : studioRootResolved.role === 'team' ? '团队引用根节点' : '员工根节点' }}
-                </div>
+              <div class="mt-3 rounded-xl bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
+                {{ selectedTeam ? getTeamDesc(selectedTeam.members, store.employees, store.teams) : '新团队尚未保存' }}
               </div>
             </div>
-            <div v-else class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-400">
-              还没有根节点，把右侧组件拖进中间画布即可开始编辑。
-            </div>
-            <div class="mt-3 text-xs leading-5 text-slate-500">
-              {{ currentTeamMembers.length ? getTeamDesc(currentTeamMembers, store.employees, store.teams) : '空团队结构' }}
-            </div>
-          </div>
 
-          <div v-if="teamStudioMessage" class="mt-4 rounded-2xl border px-4 py-3 text-sm" :class="teamStudioMessageClass">
-            {{ teamStudioMessage }}
+            <template v-if="currentMode === 'edit'">
+              <div>
+                <button
+                  class="mb-2 flex w-full items-center justify-between text-xs font-semibold tracking-[0.18em] text-slate-400"
+                  @click="togglePanel('team')"
+                >
+                  <span>团队</span>
+                  <span>{{ panelOpen.team ? '−' : '+' }}</span>
+                </button>
+                <div v-if="panelOpen.team" class="space-y-2">
+                  <div
+                    v-for="item in teamPalette"
+                    :key="`team-${item.refId}`"
+                    class="cursor-grab rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm"
+                    draggable="true"
+                    @dragstart="startPaletteDrag(item)"
+                  >
+                    <div class="flex items-center gap-2 truncate text-sm font-semibold text-slate-800">
+                      <AvatarBadge :icon="item.icon" :label="item.name" :size="28" rounded="xl" text-class="text-xs font-semibold" />
+                      <span class="truncate">{{ item.name }}</span>
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">{{ item.meta }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  class="mb-2 flex w-full items-center justify-between text-xs font-semibold tracking-[0.18em] text-slate-400"
+                  @click="togglePanel('manager')"
+                >
+                  <span>经理</span>
+                  <span>{{ panelOpen.manager ? '−' : '+' }}</span>
+                </button>
+                <div v-if="panelOpen.manager" class="space-y-2">
+                  <div
+                    v-for="item in managerPalette"
+                    :key="`manager-${item.refId}`"
+                    class="cursor-grab rounded-xl border px-3 py-3 shadow-sm"
+                    :class="item.valid ? 'border-slate-200 bg-white' : 'border-amber-200 bg-amber-50'"
+                    draggable="true"
+                    @dragstart="startPaletteDrag(item)"
+                  >
+                    <div class="flex items-center gap-2 truncate text-sm font-semibold text-slate-800">
+                      <AvatarBadge :icon="item.icon" :label="item.name" :size="28" rounded="xl" text-class="text-xs font-semibold" />
+                      <span class="truncate">{{ item.name }}</span>
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">{{ item.meta }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  class="mb-2 flex w-full items-center justify-between text-xs font-semibold tracking-[0.18em] text-slate-400"
+                  @click="togglePanel('worker')"
+                >
+                  <span>员工</span>
+                  <span>{{ panelOpen.worker ? '−' : '+' }}</span>
+                </button>
+                <div v-if="panelOpen.worker" class="space-y-2">
+                  <div
+                    v-for="item in workerPalette"
+                    :key="`worker-${item.refId}`"
+                    class="cursor-grab rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm"
+                    draggable="true"
+                    @dragstart="startPaletteDrag(item)"
+                  >
+                    <div class="flex items-center gap-2 truncate text-sm font-semibold text-slate-800">
+                      <AvatarBadge :icon="item.icon" :label="item.name" :size="28" rounded="xl" text-class="text-xs font-semibold" />
+                      <span class="truncate">{{ item.name }}</span>
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">{{ item.meta }}</div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <div
+              v-if="saveError && currentMode === 'edit'"
+              class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+            >
+              {{ saveError }}
+            </div>
           </div>
         </aside>
-
-        <main class="flex min-w-0 flex-1 flex-col">
-          <div class="border-b border-slate-200 bg-white px-6 py-4">
-            <div class="flex flex-wrap items-center gap-3">
-              <div>
-                <div class="text-sm font-semibold text-slate-800">团队画布</div>
-                <div class="mt-1 text-xs text-slate-500">中键拖拽空白区域可平移，滚轮可缩放，布局会自动居中当前团队结构。</div>
-              </div>
-              <button
-                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium"
-                @click="focusTeamContent"
-              >
-                定位到内容
-              </button>
-              <div class="text-xs text-slate-500">缩放 {{ Math.round(teamView.scale * 100) }}%</div>
-              <div class="ml-auto flex gap-3">
-                <button class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium" @click="closeTeamStudio">
-                  取消更改
-                </button>
-                <button class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" @click="saveTeam">
-                  保存团队结构
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex min-h-0 flex-1">
-            <section class="flex min-w-0 flex-1 flex-col overflow-hidden p-4">
-              <div
-                ref="teamViewportRef"
-                class="relative min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white"
-                @mousedown="startTeamPan"
-                @dragover.prevent
-                @drop="dropToRoot"
-                @wheel.prevent="handleTeamWheel"
-              >
-                <div class="absolute inset-0" :style="teamWorldStyle">
-                  <div
-                    class="relative bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1.2px,transparent_0)] bg-[length:24px_24px] bg-white"
-                    :style="{ width: `${WORLD_W}px`, height: `${WORLD_H}px` }"
-                  >
-                    <div class="absolute inset-0" :style="teamCanvasOffsetStyle">
-                      <div
-                        v-if="currentTeamMembers.length"
-                        ref="teamRootRef"
-                        class="absolute left-0 top-0"
-                        :style="{ transform: 'translate(-50%, -50%)' }"
-                      >
-                        <TeamTreeNode
-                          :raw-node="currentTeamMembers[0]"
-                          path="0"
-                          :emps="store.employees"
-                          :teams="store.teams"
-                          :drop-hint="dropHint"
-                          @remove="removeByPath"
-                          @drag-start="startTreeDrag"
-                          @drop-before="dropBefore"
-                          @drop-children="dropIntoChildren"
-                        />
-                      </div>
-                    </div>
-
-                    <div
-                      v-if="!currentTeamMembers.length"
-                      class="pointer-events-none absolute inset-0 flex items-center justify-center text-center text-slate-400"
-                    >
-                      <div>
-                        <div class="text-lg font-semibold">还没有团队根节点</div>
-                        <div class="mt-2 text-sm">把右侧的经理、员工或团队拖进来，团队画布只会保留一个根节点。</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <aside class="flex min-h-0 w-[320px] flex-col border-l border-slate-200 bg-white p-4">
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div class="text-sm font-semibold">招募推荐</div>
-                <div class="mt-1 text-xs leading-5 text-slate-500">推荐团队会跳到团队市场，可用组件可以直接拖进中间画布。</div>
-              </div>
-
-              <div class="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-                <div class="space-y-3">
-                  <RouterLink
-                    v-for="team in presetTeams"
-                    :key="`studio-${team.name}`"
-                    class="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300"
-                    to="/market?tab=team"
-                  >
-                    <div class="text-sm font-semibold text-slate-900">{{ team.name }}</div>
-                    <div class="mt-2 text-xs leading-5 text-slate-500">{{ team.desc }}</div>
-                  </RouterLink>
-                </div>
-
-                <div>
-                  <div class="mb-2 text-xs font-semibold tracking-[0.18em] text-slate-400">团队组件</div>
-                  <div class="space-y-2">
-                    <div
-                      v-for="team in availableTeamPalette"
-                      :key="`team-${team.id}`"
-                      class="cursor-grab rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm"
-                      draggable="true"
-                      @dragstart="startPaletteDrag({ kind: 'team', refId: team.id })"
-                    >
-                      <div class="flex items-center gap-2">
-                        <AvatarBadge :icon="team.icon" :label="team.name" :size="28" rounded="lg" />
-                        <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{{ team.name }}</span>
-                        <span class="rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">团队</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div class="mb-2 text-xs font-semibold tracking-[0.18em] text-slate-400">经理席位</div>
-                  <div class="space-y-2">
-                    <div
-                      v-for="emp in managerPalette"
-                      :key="`manager-${emp.id}`"
-                      class="cursor-grab rounded-xl border border-amber-200 bg-white px-3 py-3 shadow-sm"
-                      draggable="true"
-                      @dragstart="startPaletteDrag({ kind: 'emp', refId: emp.id })"
-                    >
-                      <div class="flex items-center gap-2">
-                        <AvatarBadge :icon="emp.icon" :label="emp.name" :size="28" rounded="lg" />
-                        <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{{ emp.name }}</span>
-                        <span class="rounded bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700">经理</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div class="mb-2 text-xs font-semibold tracking-[0.18em] text-slate-400">员工席位</div>
-                  <div class="space-y-2">
-                    <div
-                      v-for="emp in workerPalette"
-                      :key="`worker-${emp.id}`"
-                      class="cursor-grab rounded-xl border border-blue-200 bg-white px-3 py-3 shadow-sm"
-                      draggable="true"
-                      @dragstart="startPaletteDrag({ kind: 'emp', refId: emp.id })"
-                    >
-                      <div class="flex items-center gap-2">
-                        <AvatarBadge :icon="emp.icon" :label="emp.name" :size="28" rounded="lg" />
-                        <span class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{{ emp.name }}</span>
-                        <span class="rounded bg-blue-100 px-2 py-0.5 text-[10px] text-blue-700">员工</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </aside>
-          </div>
-        </main>
       </div>
-    </div>
+    </main>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import AvatarBadge from '../components/common/AvatarBadge.vue'
-import TeamTreeNode from '../components/employee/TeamTreeNode.vue'
+import PlacementNode from '../components/canvas/PlacementNode.vue'
+import {
+  getPlacementBounds,
+  getPlacementDesignHeight,
+  getPlacementDesignWidth,
+} from '../utils/placementBounds'
+import { resolveNode } from '../utils/tree'
 import { useSimuBossStore } from '../stores/simuBoss'
-import { cloneDeep, getTeamDesc, hasCircularTeamRef, resolveNode } from '../utils/tree'
 
+const GRID = 24
 const WORLD_W = 12000
 const WORLD_H = 12000
 const WORLD_ORIGIN_X = WORLD_W / 2
 const WORLD_ORIGIN_Y = WORLD_H / 2
 
 const store = useSimuBossStore()
-const teamStudioOpen = ref(false)
-const editingTeamId = ref(null)
-const currentTeamMembers = ref([])
-const dragging = ref(null)
-const dropHint = ref('')
-const teamStudioMessage = ref('')
-const teamStudioMessageType = ref('info')
-const teamViewportRef = ref(null)
-const teamRootRef = ref(null)
-const teamPanState = ref(null)
-const teamView = ref({ x: 32, y: 24, scale: 1 })
-const teamContentSize = ref({ width: 320, height: 176 })
+const selectedTeamId = ref(store.teams[0]?.id ?? null)
+const currentMode = ref(store.teams.length ? 'view' : 'edit')
+const viewportRef = ref(null)
+const canvasContentRef = ref(null)
+const dragPalette = ref(null)
+const panState = ref(null)
+const moveState = ref(null)
+const saveError = ref('')
+const view = ref({ x: 32, y: 24, scale: 1 })
+const draftAssignments = ref([])
+const panelOpen = ref({
+  team: true,
+  manager: true,
+  worker: true,
+})
 
 const teamForm = reactive({
   icon: 'TEAM',
   name: '',
 })
 
-const presetTeams = [
-  {
-    name: '数据采集团队',
-    desc: '擅长全网搜索、网页抓取、表格整理和信息清洗，适合先把原始资料收上来再交给分析团队。',
-    tags: ['Search', '网页采集', '表格归档', '数据清洗'],
-  },
-  {
-    name: 'PPT 制作团队',
-    desc: '负责把零散信息整理成演示文稿，覆盖大纲、页面文案、视觉排版和配图建议。',
-    tags: ['PPT 大纲', '演示排版', '图文整合', '汇报包装'],
-  },
-  {
-    name: '印度团队',
-    desc: '真人 24h 在线干活',
-    tags: ['真人执行', '24h 在线', '多班次协作', '高频跟进'],
-  },
-]
-
-const availableTeamPalette = computed(() => store.teams.filter((team) => team.id !== editingTeamId.value))
-const managerPalette = computed(() => store.employees.filter((item) => item.role === 'manager'))
-const workerPalette = computed(() => store.employees.filter((item) => item.role !== 'manager'))
-const studioRootResolved = computed(() =>
-  currentTeamMembers.value.length ? resolveNode(currentTeamMembers.value[0], store.employees, store.teams) : null,
-)
-const teamStudioMessageClass = computed(() =>
-  teamStudioMessageType.value === 'error'
-    ? 'border-rose-200 bg-rose-50 text-rose-700'
-    : teamStudioMessageType.value === 'success'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-      : 'border-slate-200 bg-slate-50 text-slate-600',
-)
-const teamCanvasOffsetStyle = computed(() => ({
+const visibleTeams = computed(() => store.teams.filter((item) => !item.hidden))
+const selectedTeam = computed(() => store.teams.find((item) => item.id === selectedTeamId.value) || null)
+const canvasWidth = computed(() => WORLD_W)
+const canvasHeight = computed(() => WORLD_H)
+const canvasOffsetStyle = computed(() => ({
   transform: `translate(${WORLD_ORIGIN_X}px, ${WORLD_ORIGIN_Y}px)`,
   transformOrigin: '0 0',
 }))
-const teamWorldStyle = computed(() => ({
-  transform: `translate(${teamView.value.x}px, ${teamView.value.y}px) scale(${teamView.value.scale})`,
+const worldStyle = computed(() => ({
+  transform: `translate(${view.value.x}px, ${view.value.y}px) scale(${view.value.scale})`,
   transformOrigin: '0 0',
 }))
 
-function setTeamStudioMessage(message, type = 'info') {
-  teamStudioMessage.value = message
-  teamStudioMessageType.value = type
+const teamPalette = computed(() =>
+  visibleTeams.value
+    .filter((team) => team.id !== selectedTeamId.value)
+    .map((team) => ({
+      kind: 'team',
+      refId: team.id,
+      linkedTeamId: team.id,
+      linkedManagerId: null,
+      name: team.name,
+      icon: team.icon,
+      meta: '拖入后展开完整团队',
+    })),
+)
+
+const managerPalette = computed(() =>
+  store.employees
+    .filter((emp) => emp.role === 'manager' && !emp.hidden)
+    .map((emp) => ({
+      kind: 'manager',
+      refId: emp.id,
+      linkedTeamId: null,
+      linkedManagerId: emp.id,
+      name: emp.name,
+      icon: emp.icon,
+      meta: '可作为团队 leader，或继续挂下属',
+      valid: true,
+    })),
+)
+
+const workerPalette = computed(() =>
+  store.employees
+    .filter((emp) => emp.role === 'worker' && !emp.hidden)
+    .map((emp) => ({
+      kind: 'employee',
+      refId: emp.id,
+      linkedTeamId: null,
+      linkedManagerId: null,
+      name: emp.name,
+      icon: emp.icon,
+      meta: '单点执行单元',
+    })),
+)
+
+function countTeamMembers(nodes) {
+  return (nodes || []).reduce((total, node) => {
+    const resolved = resolveNode(node, store.employees, store.teams)
+    if (!resolved) return total
+    if (resolved.role === 'team') {
+      return total + countTeamMembers(resolved.members || [])
+    }
+    return total + 1 + countTeamMembers(node.children || [])
+  }, 0)
 }
 
-function clearTeamStudioMessage() {
-  teamStudioMessage.value = ''
+function countManagers(nodes) {
+  return (nodes || []).reduce((total, node) => {
+    const resolved = resolveNode(node, store.employees, store.teams)
+    if (!resolved) return total
+    if (resolved.role === 'team') {
+      return total + countManagers(resolved.members || [])
+    }
+    const selfCount = resolved.role === 'manager' ? 1 : 0
+    return total + selfCount + countManagers(node.children || [])
+  }, 0)
 }
 
-function openTeamStudio(id = null) {
-  editingTeamId.value = id
-  dragging.value = null
-  dropHint.value = ''
-  clearTeamStudioMessage()
-  teamForm.icon = 'TEAM'
-  teamForm.name = ''
-  currentTeamMembers.value = []
+function getTeamDesc(members, employees, teams) {
+  const managerCount = (members || []).reduce((total, node) => {
+    const resolved = resolveNode(node, employees, teams)
+    if (!resolved) return total
+    if (resolved.role === 'team') {
+      return total + countManagers(resolved.members || [])
+    }
+    const selfCount = resolved.role === 'manager' ? 1 : 0
+    return total + selfCount + countManagers(node.children || [])
+  }, 0)
+  const totalCount = countTeamMembers(members || [])
+  return `建制链：包含 ${managerCount} 个经理、统领 ${Math.max(totalCount - managerCount, 0)} 名员工`
+}
 
-  if (id) {
-    const team = store.teams.find((item) => item.id === id)
-    if (team) {
-      teamForm.icon = team.icon
-      teamForm.name = team.name
-      currentTeamMembers.value = cloneDeep(team.members || []).slice(0, 1)
+function togglePanel(key) {
+  panelOpen.value[key] = !panelOpen.value[key]
+}
+
+function nextDraftId() {
+  return `team-draft-${crypto.randomUUID()}`
+}
+
+function buildPlacementFromResolved(node, rawNode = null) {
+  if (!node) return null
+
+  if (node.role === 'team') {
+    return {
+      id: nextDraftId(),
+      kind: 'team',
+      refId: node.id,
+      linkedTeamId: node.id,
+      linkedManagerId: null,
+      name: node.name,
+      icon: node.icon,
+      children: buildChildrenFromNodes(node.members || []),
     }
   }
 
-  teamStudioOpen.value = true
+  const childrenSource = rawNode?.children || []
+  const kind = node.role === 'manager' ? 'manager' : 'employee'
+  return {
+    id: nextDraftId(),
+    kind,
+    refId: node.id,
+    linkedTeamId: null,
+    linkedManagerId: kind === 'manager' ? node.id : null,
+    name: node.name,
+    icon: node.icon,
+    children: buildChildrenFromNodes(childrenSource),
+  }
 }
 
-function closeTeamStudio() {
-  teamStudioOpen.value = false
-  dragging.value = null
-  dropHint.value = ''
-  clearTeamStudioMessage()
+function buildChildrenFromNodes(nodes) {
+  return (nodes || [])
+    .map((rawNode) => buildPlacementFromResolved(resolveNode(rawNode, store.employees, store.teams), rawNode))
+    .filter(Boolean)
+}
+
+function buildPlacementFromPalette(item, point = null) {
+  let children = []
+  if (item.kind === 'team') {
+    const team = store.teamMap[item.refId]
+    children = buildChildrenFromNodes(team?.members || [])
+  }
+
+  return {
+    id: nextDraftId(),
+    kind: item.kind,
+    refId: item.refId,
+    linkedTeamId: item.linkedTeamId || null,
+    linkedManagerId: item.linkedManagerId || null,
+    name: item.name,
+    icon: item.icon,
+    x: point?.x ?? 0,
+    y: point?.y ?? 0,
+    children,
+  }
+}
+
+function placementToRawNode(placement) {
+  if (!placement) return null
+  return {
+    type: placement.kind === 'team' ? 'team_ref' : 'emp_ref',
+    refId: placement.refId,
+    children: (placement.children || []).map((child) => placementToRawNode(child)).filter(Boolean),
+  }
+}
+
+function loadTeamIntoCanvas(team, mode = 'view') {
+  currentMode.value = mode
+  saveError.value = ''
+  dragPalette.value = null
+
+  if (!team) {
+    teamForm.icon = 'TEAM'
+    teamForm.name = ''
+    draftAssignments.value = []
+    nextTick(() => fitViewportToContent())
+    return
+  }
+
+  teamForm.icon = team.icon
+  teamForm.name = team.name
+  draftAssignments.value = buildChildrenFromNodes(team.members || []).map((item, index) => ({
+    ...item,
+    x: index * 48,
+    y: 0,
+  }))
+  nextTick(() => fitViewportToContent())
+}
+
+function openTeam(id, mode = 'view') {
+  const original = store.teams.find((item) => item.id === id)
+  if (!original) return
+
+  if (mode === 'edit' && original.locked) {
+    const clonedId = store.cloneTeam(id)
+    if (!clonedId) return
+    const cloned = store.teams.find((item) => item.id === clonedId)
+    selectedTeamId.value = clonedId
+    loadTeamIntoCanvas(cloned, 'edit')
+    return
+  }
+
+  selectedTeamId.value = id
+  loadTeamIntoCanvas(original, mode)
+}
+
+function createTeam() {
+  selectedTeamId.value = null
+  loadTeamIntoCanvas(null, 'edit')
+}
+
+function discardDraft() {
+  loadTeamIntoCanvas(selectedTeam.value, selectedTeam.value ? 'view' : 'edit')
+}
+
+function clearCurrentTeam() {
+  if (currentMode.value !== 'edit') return
+  draftAssignments.value = []
+  saveError.value = ''
+}
+
+function validateTeamDraft() {
+  if (draftAssignments.value.length !== 1) {
+    return '一个团队只能有一个根节点，也就是团队 leader。'
+  }
+  const root = draftAssignments.value[0]
+  if (root.kind !== 'manager') {
+    return '团队根节点必须是经理。'
+  }
+  if (!(root.children || []).length) {
+    return '团队 leader 下面至少需要有一名成员。'
+  }
+  return ''
 }
 
 function saveTeam() {
-  if (currentTeamMembers.value.length > 1) {
-    setTeamStudioMessage('团队结构只能保留一个根节点，请先整理后再保存。', 'error')
+  const validationError = validateTeamDraft()
+  if (validationError) {
+    saveError.value = validationError
     return
   }
 
-  store.upsertTeam(
+  const savedId = store.upsertTeam(
     {
       icon: teamForm.icon || 'TEAM',
       name: teamForm.name || '无名小队',
-      members: currentTeamMembers.value,
-      desc: getTeamDesc(currentTeamMembers.value, store.employees, store.teams),
+      members: [placementToRawNode(draftAssignments.value[0])],
     },
-    editingTeamId.value,
+    selectedTeamId.value,
   )
 
-  setTeamStudioMessage('团队结构已保存。', 'success')
-  window.setTimeout(() => {
-    closeTeamStudio()
-  }, 180)
+  selectedTeamId.value = savedId
+  openTeam(savedId, 'view')
 }
 
-function createNodeFromDrag(payload) {
-  if (!payload) return null
-  if (payload.kind === 'emp') return { type: 'emp_ref', refId: payload.refId, children: [] }
-  if (payload.kind === 'team') return { type: 'team_ref', refId: payload.refId }
-  return null
-}
-
-function getNodeByPath(path) {
-  if (!path) return null
-  const indices = path.split('-').map((item) => Number.parseInt(item, 10))
-  let current = currentTeamMembers.value[indices[0]]
-  for (let i = 1; i < indices.length; i += 1) current = current?.children?.[indices[i]]
-  return current
-}
-
-function isRootPath(path) {
-  return !String(path).includes('-')
-}
-
-function removeByPath(path) {
-  const indices = path.split('-').map((item) => Number.parseInt(item, 10))
-  const last = indices.pop()
-  if (indices.length === 0) {
-    currentTeamMembers.value.splice(last, 1)
-    measureAndFitTeamCanvas()
-    return
-  }
-  const parent = getNodeByPath(indices.join('-'))
-  parent?.children?.splice(last, 1)
-  measureAndFitTeamCanvas()
-}
-
-function pullByPath(path) {
-  const indices = path.split('-').map((item) => Number.parseInt(item, 10))
-  const last = indices.pop()
-  if (indices.length === 0) return currentTeamMembers.value.splice(last, 1)[0]
-  const parent = getNodeByPath(indices.join('-'))
-  return parent?.children?.splice(last, 1)?.[0]
-}
-
-function insertBeforePath(path, node) {
-  const indices = path.split('-').map((item) => Number.parseInt(item, 10))
-  const last = indices.pop()
-  if (indices.length === 0) {
-    currentTeamMembers.value.splice(last, 0, node)
-    return
-  }
-  const parent = getNodeByPath(indices.join('-'))
-  if (!parent.children) parent.children = []
-  parent.children.splice(last, 0, node)
-}
-
-function startPaletteDrag(payload) {
-  dragging.value = payload
-  clearTeamStudioMessage()
-}
-
-function startTreeDrag(payload) {
-  dragging.value = payload
-  clearTeamStudioMessage()
-}
-
-function resetDragState() {
-  dragging.value = null
-  dropHint.value = ''
-}
-
-function materializeDraggingNode() {
-  if (!dragging.value) return null
-  if (dragging.value.kind === 'existing') return pullByPath(dragging.value.path)
-  if (dragging.value.kind === 'team' && hasCircularTeamRef(editingTeamId.value, dragging.value.refId, store.teams)) {
-    setTeamStudioMessage('不能形成循环团队引用。', 'error')
-    return null
-  }
-  return createNodeFromDrag(dragging.value)
-}
-
-function dropToRoot() {
-  if (dragging.value?.kind === 'existing' && dragging.value.path === '0') {
-    resetDragState()
-    return
-  }
-
-  if (currentTeamMembers.value.length) {
-    setTeamStudioMessage('团队画布只能保留一个根节点，请把新成员拖到现有经理节点内部。', 'error')
-    resetDragState()
-    return
-  }
-
-  const node = materializeDraggingNode()
-  if (!node) {
-    resetDragState()
-    return
-  }
-
-  currentTeamMembers.value = [node]
-  resetDragState()
-  setTeamStudioMessage('已放入团队根节点。', 'success')
-  measureAndFitTeamCanvas()
-}
-
-function dropBefore(path) {
-  if (dragging.value?.kind === 'existing' && path.startsWith(dragging.value.path)) return
-
-  if (isRootPath(path)) {
-    setTeamStudioMessage('团队只能有一个根节点，不能在根层级再插入新的节点。', 'error')
-    resetDragState()
-    return
-  }
-
-  const node = materializeDraggingNode()
-  if (!node) {
-    resetDragState()
-    return
-  }
-
-  insertBeforePath(path, node)
-  resetDragState()
-  clearTeamStudioMessage()
-  measureAndFitTeamCanvas()
-}
-
-function dropIntoChildren(path) {
-  if (dragging.value?.kind === 'existing' && path.startsWith(dragging.value.path)) return
-
-  const node = materializeDraggingNode()
-  if (!node) {
-    resetDragState()
-    return
-  }
-
-  const parent = getNodeByPath(path)
-  if (!parent.children) parent.children = []
-  parent.children.push(node)
-  resetDragState()
-  clearTeamStudioMessage()
-  measureAndFitTeamCanvas()
-}
-
-async function measureTeamCanvas() {
-  await nextTick()
-  if (!teamRootRef.value) {
-    teamContentSize.value = { width: 320, height: 176 }
-    return
-  }
-
-  teamContentSize.value = {
-    width: Math.max(320, teamRootRef.value.offsetWidth || 320),
-    height: Math.max(176, teamRootRef.value.offsetHeight || 176),
+function deleteTeam(id) {
+  const deletingSelected = selectedTeamId.value === id
+  store.deleteTeam(id)
+  if (!deletingSelected) return
+  const fallback = visibleTeams.value[0] || null
+  if (fallback) {
+    openTeam(fallback.id, 'view')
+  } else {
+    createTeam()
   }
 }
 
-function clampTeamViewport() {
-  const rect = teamViewportRef.value?.getBoundingClientRect()
+function startPaletteDrag(item) {
+  if (currentMode.value !== 'edit') return
+  dragPalette.value = item
+}
+
+function appendChild(list, targetId, child) {
+  return list.map((item) => {
+    if (item.id === targetId) {
+      return { ...item, children: [...(item.children || []), child] }
+    }
+    if (item.children?.length) {
+      return { ...item, children: appendChild(item.children, targetId, child) }
+    }
+    return item
+  })
+}
+
+function removeById(list, targetId) {
+  return list
+    .filter((item) => item.id !== targetId)
+    .map((item) => ({
+      ...item,
+      children: item.children?.length ? removeById(item.children, targetId) : [],
+    }))
+}
+
+function removePlacement(id) {
+  if (currentMode.value !== 'edit') return
+  draftAssignments.value = removeById(draftAssignments.value, id)
+}
+
+function dropIntoNode(targetId) {
+  if (currentMode.value !== 'edit' || !dragPalette.value) return
+  draftAssignments.value = appendChild(
+    draftAssignments.value,
+    targetId,
+    buildPlacementFromPalette(dragPalette.value),
+  )
+  dragPalette.value = null
+  saveError.value = ''
+}
+
+function snap(value) {
+  return Math.round(value / GRID) * GRID
+}
+
+function pointFromEvent(clientX, clientY) {
+  const rect = viewportRef.value?.getBoundingClientRect()
+  if (!rect) return { x: 0, y: 0 }
+  const width = dragPalette.value ? getPlacementDesignWidth(dragPalette.value) : 188
+  const x =
+    (clientX - rect.left - view.value.x) / view.value.scale - WORLD_ORIGIN_X - width / 2
+  const y =
+    (clientY - rect.top - view.value.y) / view.value.scale - WORLD_ORIGIN_Y - 44
+  return { x: snap(x), y: snap(y) }
+}
+
+function handleRootDrop(event) {
+  if (currentMode.value !== 'edit' || !dragPalette.value) return
+  const point = pointFromEvent(event.clientX, event.clientY)
+  draftAssignments.value = [
+    ...draftAssignments.value,
+    buildPlacementFromPalette(dragPalette.value, point),
+  ]
+  dragPalette.value = null
+  saveError.value = ''
+}
+
+function startRootMove(payload) {
+  if (currentMode.value !== 'edit') return
+  document.body.style.userSelect = 'none'
+  moveState.value = {
+    id: payload.placement.id,
+    startX: payload.event.clientX,
+    startY: payload.event.clientY,
+    originX: payload.placement.x || 0,
+    originY: payload.placement.y || 0,
+  }
+  window.addEventListener('mousemove', moveRoot)
+  window.addEventListener('mouseup', stopRootMove, { once: true })
+}
+
+function moveRoot(event) {
+  if (!moveState.value) return
+  const dx = (event.clientX - moveState.value.startX) / view.value.scale
+  const dy = (event.clientY - moveState.value.startY) / view.value.scale
+  const point = { x: snap(moveState.value.originX + dx), y: snap(moveState.value.originY + dy) }
+  draftAssignments.value = draftAssignments.value.map((item) =>
+    item.id === moveState.value.id ? { ...item, ...point } : item,
+  )
+}
+
+function stopRootMove() {
+  moveState.value = null
+  document.body.style.userSelect = ''
+  window.removeEventListener('mousemove', moveRoot)
+}
+
+function startPan(event) {
+  if (event.target?.closest?.('[data-placement-card="true"]')) return
+  panState.value = {
+    startX: event.clientX,
+    startY: event.clientY,
+    originX: view.value.x,
+    originY: view.value.y,
+  }
+  window.addEventListener('mousemove', movePan)
+  window.addEventListener('mouseup', stopPan, { once: true })
+}
+
+function movePan(event) {
+  if (!panState.value) return
+  view.value = {
+    ...view.value,
+    x: panState.value.originX + (event.clientX - panState.value.startX),
+    y: panState.value.originY + (event.clientY - panState.value.startY),
+  }
+  clampViewport()
+}
+
+function stopPan() {
+  panState.value = null
+  window.removeEventListener('mousemove', movePan)
+}
+
+const contentBounds = computed(() =>
+  getPlacementBounds(draftAssignments.value, {
+    padding: 96,
+  }),
+)
+
+function clampViewport() {
+  const rect = viewportRef.value?.getBoundingClientRect()
   if (!rect) return
-  const scaledWidth = WORLD_W * teamView.value.scale
-  const scaledHeight = WORLD_H * teamView.value.scale
+  const scaledWidth = canvasWidth.value * view.value.scale
+  const scaledHeight = canvasHeight.value * view.value.scale
   const minX = scaledWidth <= rect.width ? (rect.width - scaledWidth) / 2 : rect.width - scaledWidth
   const maxX = scaledWidth <= rect.width ? minX : 0
   const minY = scaledHeight <= rect.height ? (rect.height - scaledHeight) / 2 : rect.height - scaledHeight
   const maxY = scaledHeight <= rect.height ? minY : 0
-  teamView.value = {
-    ...teamView.value,
-    x: Math.min(maxX, Math.max(minX, teamView.value.x)),
-    y: Math.min(maxY, Math.max(minY, teamView.value.y)),
+  view.value = {
+    ...view.value,
+    x: Math.min(maxX, Math.max(minX, view.value.x)),
+    y: Math.min(maxY, Math.max(minY, view.value.y)),
   }
 }
 
-function fitViewportToTeamContent() {
-  const rect = teamViewportRef.value?.getBoundingClientRect()
+function fitViewportToContent() {
+  const rect = viewportRef.value?.getBoundingClientRect()
   if (!rect) return
-  const paddedWidth = teamContentSize.value.width + 192
-  const paddedHeight = teamContentSize.value.height + 192
+  const bounds = contentBounds.value
+  const paddedWidth = Math.max(420, bounds.width)
+  const paddedHeight = Math.max(260, bounds.height)
   const fitScale = Math.min(rect.width / paddedWidth, rect.height / paddedHeight, 1)
   const nextScale = Math.max(0.42, fitScale)
-
-  teamView.value = {
+  view.value = {
     scale: nextScale,
-    x: rect.width / 2 - WORLD_ORIGIN_X * nextScale,
-    y: rect.height / 2 - WORLD_ORIGIN_Y * nextScale,
+    x: rect.width / 2 - ((bounds.minX + bounds.maxX) / 2 + WORLD_ORIGIN_X) * nextScale,
+    y: rect.height / 2 - ((bounds.minY + bounds.maxY) / 2 + WORLD_ORIGIN_Y) * nextScale,
   }
-
-  clampTeamViewport()
+  clampViewport()
 }
 
-async function measureAndFitTeamCanvas() {
-  await measureTeamCanvas()
-  fitViewportToTeamContent()
+function focusContent() {
+  fitViewportToContent()
 }
 
-function focusTeamContent() {
-  measureAndFitTeamCanvas()
-}
-
-function startTeamPan(event) {
-  if (event.target?.closest?.('button, input, textarea, a')) return
-  if (event.target?.closest?.('[draggable="true"]')) return
-
-  teamPanState.value = {
-    startX: event.clientX,
-    startY: event.clientY,
-    originX: teamView.value.x,
-    originY: teamView.value.y,
-  }
-  window.addEventListener('mousemove', moveTeamPan)
-  window.addEventListener('mouseup', stopTeamPan, { once: true })
-}
-
-function moveTeamPan(event) {
-  if (!teamPanState.value) return
-  teamView.value = {
-    ...teamView.value,
-    x: teamPanState.value.originX + (event.clientX - teamPanState.value.startX),
-    y: teamPanState.value.originY + (event.clientY - teamPanState.value.startY),
-  }
-  clampTeamViewport()
-}
-
-function stopTeamPan() {
-  teamPanState.value = null
-  window.removeEventListener('mousemove', moveTeamPan)
-}
-
-function handleTeamWheel(event) {
-  const rect = teamViewportRef.value?.getBoundingClientRect()
+function handleWheel(event) {
+  const rect = viewportRef.value?.getBoundingClientRect()
   if (!rect) return
-  const oldScale = teamView.value.scale
-  const fitScale = Math.min(rect.width / WORLD_W, rect.height / WORLD_H)
+  const oldScale = view.value.scale
+  const fitScale = Math.min(rect.width / canvasWidth.value, rect.height / canvasHeight.value)
   const minScale = Math.min(1, Math.max(0.35, fitScale))
-  const nextScale = Math.min(1.16, Math.max(minScale, oldScale * (event.deltaY > 0 ? 0.98 : 1.02)))
+  const nextScale = Math.min(1.12, Math.max(minScale, oldScale * (event.deltaY > 0 ? 0.98 : 1.02)))
   const px = event.clientX - rect.left
   const py = event.clientY - rect.top
-  const wx = (px - teamView.value.x) / oldScale
-  const wy = (py - teamView.value.y) / oldScale
-
-  teamView.value = {
+  const wx = (px - view.value.x) / oldScale
+  const wy = (py - view.value.y) / oldScale
+  view.value = {
     scale: nextScale,
     x: px - wx * nextScale,
     y: py - wy * nextScale,
   }
-
-  clampTeamViewport()
+  clampViewport()
 }
 
 onMounted(() => {
-  window.addEventListener('resize', measureAndFitTeamCanvas)
+  window.addEventListener('resize', fitViewportToContent)
+  if (visibleTeams.value.length) {
+    openTeam(visibleTeams.value[0].id, 'view')
+  } else {
+    createTeam()
+  }
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('mousemove', moveTeamPan)
-  window.removeEventListener('resize', measureAndFitTeamCanvas)
-})
-
-watch(teamStudioOpen, async (open) => {
-  if (!open) return
-  await measureAndFitTeamCanvas()
+  window.removeEventListener('mousemove', movePan)
+  window.removeEventListener('resize', fitViewportToContent)
 })
 
 watch(
-  currentTeamMembers,
+  draftAssignments,
   async () => {
-    if (!teamStudioOpen.value) return
-    await measureAndFitTeamCanvas()
+    await nextTick()
+    fitViewportToContent()
   },
   { deep: true },
 )

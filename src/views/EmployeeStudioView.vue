@@ -46,7 +46,7 @@
                   <span>{{ emp.name }}</span>
                   <span
                     class="rounded px-2 py-0.5 text-[10px] font-medium"
-                    :class="emp.role === 'manager' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'"
+                    :class="emp.role === 'manager' ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'"
                   >
                     {{ emp.role === 'manager' ? '经理' : '工人' }}
                   </span>
@@ -66,8 +66,9 @@
       </div>
     </section>
 
-    <div v-if="employeeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
-      <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+    <Dialog v-model:open="employeeModalOpen">
+      <DialogContent class="max-h-[88vh] max-w-2xl p-0" hide-close>
+      <div class="w-full rounded-2xl bg-white p-6 shadow-2xl">
         <div class="mb-5 flex items-center justify-between">
           <h2 class="text-lg font-semibold text-slate-900">{{ avatarUi.modalTitle(editingEmployeeId) }}</h2>
           <button class="text-xl text-slate-400" @click="employeeModalOpen = false">x</button>
@@ -164,9 +165,11 @@
           <button class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white" @click="saveEmployee">保存</button>
         </div>
       </div>
-    </div>
+      </DialogContent>
+    </Dialog>
 
-    <div v-if="teamStudioOpen" class="fixed inset-0 z-50 bg-slate-950/70">
+    <Dialog v-model:open="teamStudioOpen">
+      <DialogContent class="h-[92vh] max-w-[96vw] p-0" hide-close>
       <div class="flex h-full w-full bg-white">
         <aside class="flex w-[360px] flex-col border-r border-slate-200 bg-white">
           <div class="border-b border-slate-200 p-5">
@@ -210,7 +213,7 @@
                   <span class="flex-1">{{ emp.name }}</span>
                   <span
                     class="rounded px-2 py-0.5 text-[10px]"
-                    :class="emp.role === 'manager' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'"
+                    :class="emp.role === 'manager' ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'"
                   >
                     {{ emp.role === 'manager' ? '经理' : '工人' }}
                   </span>
@@ -254,13 +257,15 @@
           </div>
         </section>
       </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import AvatarBadge from '../components/common/AvatarBadge.vue'
+import { Dialog, DialogContent } from '../components/ui/dialog'
 import { AVATAR_LIBRARY } from '../config/avatarLibrary'
 import TeamTreeNode from '../components/employee/TeamTreeNode.vue'
 import { useSimuBossStore } from '../stores/simuBoss'
