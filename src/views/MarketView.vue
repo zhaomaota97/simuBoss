@@ -200,12 +200,12 @@ const presetTeams = [
           deliverableType: 'ppt',
           prompt: '你负责把上传的 Word 材料拆解成 PPT 生产任务，安排团队成员完成 JSON 组装，并在最终渲染前做汇总校验。',
           plannerPrompt:
-            '你负责把 Word 到 PPT 的生产链拆成清晰的子任务，合理分配给直属工人。前几个工人负责把 Word 整理成符合渲染器要求的 JSON 对象，最后一个工人负责调用渲染器生成 PPT。',
+            '你负责把 Word 到 PPT 的生产链拆成清晰的子任务，合理分配给直属工人。前几个工人负责把 Word 整理成符合当前财咖模板的原生 PPT JSON 对象，最后一个工人负责调用渲染器生成 PPT。',
           synthesizerPrompt:
-            '你负责汇总团队成员产出的页面结构与内容 JSON，确认其满足 PPT 渲染规范，再交给渲染工人生成最终 PPT 文件。',
+            '你负责汇总团队成员产出的章节蓝图与内容素材，确认其满足当前财咖模板的原生 PPT JSON 规范，再交给渲染工人生成最终 PPT 文件。',
           temperature: 0.4,
           maxTokens: 4096,
-          requireApproval: true,
+          requireApproval: false,
           fixedPlan: {
             summary: '将上传的 Word 材料处理成固定的 PPT 生产流程。',
             deliverable: '一份最终可下载的 PPT 文件。',
@@ -215,7 +215,7 @@ const presetTeams = [
                 title: '解析 Word 并规划 PPT 结构',
                 assigneeRefId: 'caika-structure',
                 task:
-                  '请读取上传的 Word 材料，规划 PPT 页数、页型与每页核心标题。输出结构化 JSON，字段必须包含 slides（数组）、每页的 type、title、goal、requiredFields。',
+                  '请读取上传的 Word 材料，规划这份汇报的章节结构与页面蓝图。输出结构化 JSON，字段包含 cover 建议、sections 数组、每个 section 的 title，以及每页的 layout、title、goal、requiredEvidence。请尽可能充分使用当前财咖模板已启用的各类版式，但不要为了凑数硬用不合适的页面。',
                 dependsOn: [],
                 reason: '先确定整份 PPT 的页结构。',
               },
@@ -230,10 +230,10 @@ const presetTeams = [
               },
               {
                 id: 't3',
-                title: '组装最终的 content.json 对象',
+                title: '组装最终的 PPT JSON 对象',
                 assigneeRefId: 'caika-content',
                 task:
-                  '请基于前序结构规划和洞察结果，输出一个完整、可直接用于 PPT 渲染的 content.json JSON 对象。不要生成文件，只输出 JSON 对象本身。',
+                  '请基于前序结构规划和洞察结果，输出一个完整、可直接用于当前财咖模板渲染的 PPT JSON 对象。顶层必须包含 cover、sections、ending，不要生成文件，只输出 JSON 对象本身，并尽可能充分利用当前模板已启用的各类 layout。请特别注意版式覆盖率，避免整份 PPT 只重复少数几种 layout。',
                 dependsOn: ['t1', 't2'],
                 reason: '把结构与内容合并成最终渲染数据。',
               },
@@ -242,7 +242,7 @@ const presetTeams = [
                 title: '渲染最终 PPT 文件',
                 assigneeRefId: 'caika-renderer',
                 task:
-                  '请接收最终的 content.json JSON 对象，校验其结构后调用 PPT 渲染器生成最终 PPT 文件，并返回文件下载信息。',
+                  '请接收最终的 PPT JSON 对象，校验其结构后调用 PPT 渲染器生成最终 PPT 文件，并返回文件下载信息。',
                 dependsOn: ['t3'],
                 reason: '最后一步只负责把 JSON 变成 PPT 文件。',
               },
@@ -262,7 +262,7 @@ const presetTeams = [
           deliverableType: 'text',
           executionMode: 'llm',
           prompt:
-            '你只负责一件事：把上传的 Word 内容拆成适合 PPT 的页结构。输出每页类型、页标题、核心要点和所需字段，不生成最终文件。',
+            '你只负责一件事：把上传的 Word 内容拆成适合当前财咖模板的章节与页面结构。输出 cover 建议、sections、每页 layout、页标题、核心目标和所需证据，尽可能用到更多合适的模板版式，并注意不同版式家族的覆盖率，但不要硬凑，不生成最终文件。',
           temperature: 0.4,
           maxTokens: 4096,
         },
@@ -277,7 +277,7 @@ const presetTeams = [
           deliverableType: 'text',
           executionMode: 'llm',
           prompt:
-            '你只负责一件事：把页面大纲补成适合 content.json 的正文内容，确保每页标题、正文、要点和结论表达清晰。',
+            '你只负责一件事：把页面大纲补成适合当前财咖模板的最终 PPT JSON，确保只使用 cover、sections、ending，以及当前模板已启用的 layout 集合，并尽可能把更多合适版式用起来，尤其避免整份 PPT 反复只用少数几种 layout。',
           temperature: 0.5,
           maxTokens: 4096,
         },
@@ -292,7 +292,7 @@ const presetTeams = [
           deliverableType: 'text',
           executionMode: 'llm',
           prompt:
-            '你只负责一件事：从会议纪要或文本材料中提炼洞察、数据亮点和管理层关心的结论，并把这些内容补进 PPT JSON 所需字段。',
+            '你只负责一件事：从会议纪要或文本材料中提炼洞察、数据亮点和管理层关心的结论，并把这些内容整理成可供最终 PPT JSON 直接引用的结构化素材。',
           temperature: 0.4,
           maxTokens: 4096,
         },
@@ -307,7 +307,7 @@ const presetTeams = [
           deliverableType: 'ppt',
           executionMode: 'ppt_renderer',
           prompt:
-            '你只负责一件事：接收最终的 JSON 对象，检查它是否符合 PPT 渲染器要求，然后把该 JSON 对象直接传给 app.py，生成最终 PPT 文件。',
+            '你只负责一件事：接收最终的 PPT JSON 对象，检查它是否符合当前财咖模板渲染器要求，然后把该 JSON 对象直接传给 app.py，生成最终 PPT 文件。',
           temperature: 0.2,
           maxTokens: 4096,
         },

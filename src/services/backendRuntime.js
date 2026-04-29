@@ -1,5 +1,14 @@
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
 
+export class RuntimeRequestError extends Error {
+  constructor(message, options = {}) {
+    super(message)
+    this.name = 'RuntimeRequestError'
+    this.status = options.status || 0
+    this.code = options.code || ''
+  }
+}
+
 function parseEventBlock(block) {
   const lines = block.split('\n')
   let event = 'message'
@@ -59,7 +68,15 @@ export async function executeRuntimeTask({
 
   if (!response.ok || !response.body) {
     const text = await response.text().catch(() => '')
-    throw new Error(text || `Runtime request failed with ${response.status}`)
+    let detail = text
+    try {
+      const parsed = JSON.parse(text || '{}')
+      detail = parsed.detail || parsed.message || text
+    } catch {}
+    throw new RuntimeRequestError(detail || `Runtime request failed with ${response.status}`, {
+      status: response.status,
+      code: response.status === 401 ? 'UNAUTHORIZED' : '',
+    })
   }
 
   const reader = response.body.getReader()

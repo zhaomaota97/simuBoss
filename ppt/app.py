@@ -1,274 +1,433 @@
+from __future__ import annotations
+
 import copy
 import json
+import sys
 from pathlib import Path
 
 from pptx import Presentation
 
 
-TEMPLATE = "破局审计内卷·共拓万亿蓝海.pptx"
-CONTENT = "content.json"
-OUTPUT = "财咖售前方案.pptx"
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATE = BASE_DIR / "caika-template.pptx"
+CONTENT = BASE_DIR / "content.json"
+OUTPUT = BASE_DIR / "财咖分析云售前SOP实战指南-生成版.pptx"
 
-# 模板中各类 slide 的原始索引（0-based）
-IDX = {
+SECTION_COVER_INDICES = [2, 5, 13, 17, 21]
+LAYOUTS = {
     "cover": 0,
     "toc": 1,
-    "text": 2,
-    "module": 7,
-    "three_cols": 5,
-    "steps": 15,
-    "numbered": 17,
-    "four_grid": 9,
-    "ending": 28,
+    "focus_2": 3,
+    "levels_3": 4,
+    "insight_4": 6,
+    "duo_detail": 7,
+    "numbered_3": 8,
+    "process_4": 9,
+    "pair_cards_2": 10,
+    "columns_3": 11,
+    "balanced_4": 12,
+    "dual_story": 14,
+    "stacked_3": 15,
+    "quadrant_4": 16,
+    "compare_2": 18,
+    "advantage_4": 19,
+    "service_3": 20,
+    "followup_4": 22,
+    "followup_2": 23,
+    "followup_3": 24,
+    "ending": 25,
 }
 
-
-def load_content(path):
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+PML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 
 
-def copy_slide(prs, src_index):
-    """深拷贝指定索引的 slide，并正确处理背景与图片关系。"""
-    src_slide = prs.slides[src_index]
-    layout = src_slide.slide_layout
-    new_slide = prs.slides.add_slide(layout)
+def _configure_stdio() -> None:
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(errors="backslashreplace")
+        except Exception:
+            pass
 
-    p_ns = "http://schemas.openxmlformats.org/presentationml/2006/main"
-    src_csld = src_slide._element.find(f"{{{p_ns}}}cSld")
-    new_csld = new_slide._element.find(f"{{{p_ns}}}cSld")
-    if src_csld is not None and new_csld is not None:
-        src_bg = src_csld.find(f"{{{p_ns}}}bg")
-        if src_bg is not None:
-            old_bg = new_csld.find(f"{{{p_ns}}}bg")
-            if old_bg is not None:
-                new_csld.remove(old_bg)
-            new_csld.insert(0, copy.deepcopy(src_bg))
 
-    sp_tree = new_slide.shapes._spTree
-    for child in list(sp_tree):
-        sp_tree.remove(child)
+def load_content(path: str | Path = CONTENT) -> dict:
+    with Path(path).open("r", encoding="utf-8") as handle:
+        return json.load(handle)
 
-    r_embed = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
-    r_link = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}link"
 
-    for child in src_slide.shapes._spTree:
-        new_child = copy.deepcopy(child)
-        for elem in new_child.iter():
-            for attr in (r_embed, r_link):
-                old_rid = elem.get(attr)
-                if old_rid and old_rid in src_slide.part.rels:
-                    rel = src_slide.part.rels[old_rid]
-                    new_rid = new_slide.part.relate_to(rel.target_part, rel.reltype)
-                    elem.set(attr, new_rid)
-        sp_tree.append(new_child)
+def get_shape(slide, shape_name: str):
+    for shape in slide.shapes:
+        if shape.name == shape_name and hasattr(shape, "text_frame"):
+            return shape
+    return None
+
+
+def set_shape_text(slide, shape_name: str, text: str) -> None:
+    shape = get_shape(slide, shape_name)
+    if shape is None:
+        return
+
+    frame = shape.text_frame
+    value = str(text or "")
+    paragraphs = list(frame.paragraphs)
+    if not paragraphs:
+        frame.text = value
+        return
+
+    first_paragraph = paragraphs[0]
+    if first_paragraph.runs:
+        first_paragraph.runs[0].text = value
+        for run in list(first_paragraph.runs[1:]):
+            first_paragraph._p.remove(run._r)
+    else:
+        run = first_paragraph.add_run()
+        run.text = value
+
+    for paragraph in list(frame.paragraphs[1:]):
+        paragraph._p.getparent().remove(paragraph._p)
+
+
+def _remap_relationship_ids(element, rel_map: dict[str, str]) -> None:
+    for node in element.iter():
+        for attr_name, attr_value in list(node.attrib.items()):
+            if attr_value in rel_map:
+                node.set(attr_name, rel_map[attr_value])
+
+
+def copy_slide(prs: Presentation, source_index: int):
+    source = prs.slides[source_index]
+    new_slide = prs.slides.add_slide(source.slide_layout)
+
+    for shape in list(new_slide.shapes):
+        sp = shape.element
+        sp.getparent().remove(sp)
+
+    rel_map = {}
+    for rel_id, rel in source.part.rels.items():
+        if "slideLayout" in rel.reltype or "notesSlide" in rel.reltype:
+            continue
+        if rel.is_external:
+            new_rel_id = new_slide.part.rels._add_relationship(rel.reltype, rel.target_ref, is_external=True)
+        else:
+            new_rel_id = new_slide.part.rels._add_relationship(rel.reltype, rel.target_part, is_external=False)
+        rel_map[rel_id] = new_rel_id
+
+    source_c_sld = source.element.find(f"{{{PML_NS}}}cSld")
+    target_c_sld = new_slide.element.find(f"{{{PML_NS}}}cSld")
+    if source_c_sld is not None and target_c_sld is not None:
+        source_bg = source_c_sld.find(f"{{{PML_NS}}}bg")
+        target_bg = target_c_sld.find(f"{{{PML_NS}}}bg")
+        if target_bg is not None:
+            target_c_sld.remove(target_bg)
+        if source_bg is not None:
+            new_bg = copy.deepcopy(source_bg)
+            _remap_relationship_ids(new_bg, rel_map)
+            target_c_sld.insert(0, new_bg)
+
+    for shape in source.shapes:
+        new_el = copy.deepcopy(shape.element)
+        _remap_relationship_ids(new_el, rel_map)
+        new_slide.shapes._spTree.insert_element_before(new_el, "p:extLst")
 
     return new_slide
 
 
-def set_shape_text(slide, name, text):
-    for shape in slide.shapes:
-        if shape.name == name and shape.has_text_frame:
-            tf = shape.text_frame
-            for para in tf.paragraphs:
-                for run in para.runs:
-                    run.text = ""
-            if tf.paragraphs[0].runs:
-                tf.paragraphs[0].runs[0].text = text
-            else:
-                tf.paragraphs[0].text = text
-            return True
-    return False
+def delete_original_slides(prs: Presentation, original_count: int) -> None:
+    slide_ids = prs.slides._sldIdLst  # noqa: SLF001
+    for _ in range(original_count):
+        element = slide_ids[0]
+        slide_ids.remove(element)
 
 
-def set_placeholder(slide, idx, text):
-    for shape in slide.shapes:
-        if shape.is_placeholder and shape.placeholder_format.idx == idx:
-            tf = shape.text_frame
-            if tf.paragraphs[0].runs:
-                tf.paragraphs[0].runs[0].text = text
-                for p in tf.paragraphs[1:]:
-                    p._p.getparent().remove(p._p)
-            else:
-                tf.paragraphs[0].text = text
-            return True
-    return False
+def _merge_text(*parts: str) -> str:
+    cleaned = [str(part).strip() for part in parts if str(part or "").strip()]
+    return "\n".join(cleaned)
 
 
-def set_textbox(slide, name, text):
-    for shape in slide.shapes:
-        if shape.name == name and shape.has_text_frame:
-            tf = shape.text_frame
-            if tf.paragraphs[0].runs:
-                tf.paragraphs[0].runs[0].text = text
-            else:
-                tf.paragraphs[0].text = text
-            return True
-    return False
+def _normalize_section_id(value: str | None, fallback_index: int) -> str:
+    raw = str(value or "").strip()
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if digits:
+        return digits.zfill(2)
+    return f"{fallback_index + 1:02d}"
 
 
-def delete_original_slides(prs, count):
-    slide_id_list = prs.slides._sldIdLst
-    for _ in range(count):
-        sld_id = slide_id_list[0]
-        rid = sld_id.get(
-            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
-        )
-        prs.part.drop_rel(rid)
-        slide_id_list.remove(sld_id)
+def _section_titles(content_data: dict) -> list[str]:
+    sections = list(content_data.get("sections") or [])
+    return [str(section.get("title") or "").strip() for section in sections[:5]]
 
 
-def build_cover(prs, data):
-    slide = copy_slide(prs, IDX["cover"])
-    set_placeholder(slide, 0, data["title"])
-    set_textbox(slide, "文本框 2", data["subtitle"])
+def _items(page: dict, key: str = "items") -> list[dict]:
+    return list(page.get(key) or [])
+
+
+def _set_triples(slide, slots: list[tuple[str, str, str]], items: list[dict]) -> None:
+    for index, (a_name, b_name, c_name) in enumerate(slots):
+        item = items[index] if index < len(items) else {}
+        set_shape_text(slide, a_name, item.get("label", "") if item else "")
+        set_shape_text(slide, b_name, item.get("title", ""))
+        set_shape_text(slide, c_name, item.get("text", ""))
+
+
+def _set_pairs(slide, slots: list[tuple[str, str]], items: list[dict], use_note: bool = False) -> None:
+    for index, (title_name, body_name) in enumerate(slots):
+        item = items[index] if index < len(items) else {}
+        body = _merge_text(item.get("text", ""), item.get("note", "")) if use_note else item.get("text", "")
+        set_shape_text(slide, title_name, item.get("title", ""))
+        set_shape_text(slide, body_name, body)
+
+
+def build_cover(prs: Presentation, data: dict):
+    slide = copy_slide(prs, LAYOUTS["cover"])
+    set_shape_text(slide, "Text 7", data.get("title", ""))
+    set_shape_text(slide, "Text 1", data.get("subtitle", ""))
+    set_shape_text(slide, "Text 2", data.get("date", ""))
     return slide
 
 
-def build_module(prs, data):
-    slide = copy_slide(prs, IDX["module"])
-    set_shape_text(slide, "Text 2", data["module_no"])
-    set_shape_text(slide, "Text 3", data["module_name"])
-    set_shape_text(slide, "Text 5", data["subtitle"])
-    set_shape_text(slide, "Text 8", data["tagline"])
+def build_toc(prs: Presentation, section_titles: list[str]):
+    slide = copy_slide(prs, LAYOUTS["toc"])
+    slots = [
+        ("Text 8", "Text 9"),
+        ("Text 10", "Text 11"),
+        ("Text 12", "Text 13"),
+        ("Text 14", "Text 15"),
+        ("Text 16", "Text 17"),
+    ]
+    for index, (number_name, title_name) in enumerate(slots):
+        title = section_titles[index] if index < len(section_titles) else ""
+        set_shape_text(slide, number_name, f"{index + 1:02d}." if title else "")
+        set_shape_text(slide, title_name, title)
     return slide
 
 
-def build_three_cols(prs, data):
-    slide = copy_slide(prs, IDX["three_cols"])
-    set_shape_text(slide, "Text 0", data["tag"])
-    set_shape_text(slide, "Text 1", data["title"])
-
-    cols = data["cols"]
-    set_shape_text(slide, "Text 6", cols[0]["heading"])
-    set_shape_text(slide, "Text 7", cols[0]["body"])
-    set_shape_text(slide, "Text 10", cols[0]["quote"])
-    set_shape_text(slide, "Text 14", cols[1]["heading"])
-    set_shape_text(slide, "Text 15", cols[1]["body"])
-    set_shape_text(slide, "Text 18", cols[1]["quote"])
-    set_shape_text(slide, "Text 22", cols[2]["heading"])
-    set_shape_text(slide, "Text 23", cols[2]["body"])
-    set_shape_text(slide, "Text 26", cols[2]["quote"])
-    set_shape_text(slide, "Text 30", data["footer"])
+def build_section_cover(prs: Presentation, section: dict, section_index: int):
+    template_index = SECTION_COVER_INDICES[min(section_index, len(SECTION_COVER_INDICES) - 1)]
+    slide = copy_slide(prs, template_index)
+    set_shape_text(slide, "Text 0", _normalize_section_id(section.get("id"), section_index))
+    set_shape_text(slide, "Text 1", section.get("title", ""))
     return slide
 
 
-def build_steps(prs, data):
-    slide = copy_slide(prs, IDX["steps"])
-    set_shape_text(slide, "Text 0", data["tag"])
-    set_shape_text(slide, "Text 1", data["title"])
-    set_shape_text(slide, "Text 3", data["intro"])
-
-    steps = data["steps"]
-    set_shape_text(slide, "Text 5", steps[0]["step"].split()[0])
-    set_shape_text(slide, "Text 6", steps[0]["step"].split()[1])
-    set_shape_text(slide, "Text 8", steps[0]["phase"])
-    set_shape_text(slide, "Text 10", steps[0]["action"])
-    set_shape_text(slide, "Text 13", steps[0]["detail_a"])
-    set_shape_text(slide, "Text 16", steps[0]["detail_b"])
-
-    set_shape_text(slide, "Text 18", steps[1]["step"].split()[0])
-    set_shape_text(slide, "Text 19", steps[1]["step"].split()[1])
-    set_shape_text(slide, "Text 21", steps[1]["phase"])
-    set_shape_text(slide, "Text 23", steps[1]["action"])
-    set_shape_text(slide, "Text 26", steps[1]["detail_a"])
-    set_shape_text(slide, "Text 29", steps[1]["detail_b"])
-
-    set_shape_text(slide, "Text 31", steps[2]["step"].split()[0])
-    set_shape_text(slide, "Text 32", steps[2]["step"].split()[1])
-    set_shape_text(slide, "Text 34", steps[2]["phase"])
-    set_shape_text(slide, "Text 36", steps[2]["action"])
-    set_shape_text(slide, "Text 39", steps[2]["detail_a"])
-    set_shape_text(slide, "Text 42", steps[2]["detail_b"])
-
-    set_shape_text(slide, "Text 46", data["footer"])
+def build_focus_2(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["focus_2"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 5", "Text 6"), ("Text 7", "Text 8")], _items(page), False)
     return slide
 
 
-def build_numbered_list(prs, data):
-    slide = copy_slide(prs, IDX["numbered"])
-    set_shape_text(slide, "Text 0", data["tag"])
-    set_shape_text(slide, "Text 1", data["title"])
-    set_shape_text(slide, "Text 3", data["intro"])
-
-    items = data["items"]
-    offsets = [(6, 7, 8), (11, 12, 13), (16, 17, 18)]
-    for i, item in enumerate(items[:3]):
-        no_idx, heading_idx, body_idx = offsets[i]
-        set_shape_text(slide, f"Text {no_idx}", item["no"])
-        set_shape_text(slide, f"Text {heading_idx}", item["heading"])
-        set_shape_text(slide, f"Text {body_idx}", item["body"])
-
-    set_shape_text(slide, "Text 29", data["footer"])
+def build_levels_3(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["levels_3"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_triples(
+        slide,
+        [("Text 1", "Text 2", "Text 3"), ("Text 4", "Text 5", "Text 6"), ("Text 7", "Text 8", "Text 9")],
+        _items(page),
+    )
     return slide
 
 
-def build_four_grid(prs, data):
-    slide = copy_slide(prs, IDX["four_grid"])
-    set_shape_text(slide, "Text 0", data["tag"])
-    set_shape_text(slide, "Text 1", data["title"])
-
-    items = data["items"]
-    set_shape_text(slide, "Text 6", items[0]["heading"])
-    set_shape_text(slide, "Text 7", items[0]["body"])
-    set_shape_text(slide, "Text 10", items[0]["quote"])
-    set_shape_text(slide, "Text 14", items[1]["heading"])
-    set_shape_text(slide, "Text 15", items[1]["body"])
-    set_shape_text(slide, "Text 18", items[1]["quote"])
-    set_shape_text(slide, "Text 22", items[2]["heading"])
-    set_shape_text(slide, "Text 23", items[2]["body"])
-    set_shape_text(slide, "Text 26", items[2]["quote"])
-    set_shape_text(slide, "Text 30", items[3]["heading"])
-    set_shape_text(slide, "Text 31", items[3]["body"])
-    set_shape_text(slide, "Text 34", items[3]["quote"])
-    set_shape_text(slide, "Text 38", data["footer"])
+def build_insight_4(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["insight_4"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(
+        slide,
+        [("Text 5", "Text 6"), ("Text 7", "Text 8"), ("Text 9", "Text 10"), ("Text 11", "Text 12")],
+        _items(page),
+        False,
+    )
     return slide
 
 
-def build_ending(prs, data):
-    slide = copy_slide(prs, IDX["ending"])
-    set_placeholder(slide, 10, data["name"])
+def build_duo_detail(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["duo_detail"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 5", "Text 6"), ("Text 7", "Text 8")], _items(page), False)
     return slide
 
 
-BUILDERS = {
-    "module": build_module,
-    "three_cols": build_three_cols,
-    "steps": build_steps,
-    "numbered_list": build_numbered_list,
-    "four_grid": build_four_grid,
-}
+def build_numbered_3(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["numbered_3"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_triples(
+        slide,
+        [("Text 1", "Text 2", "Text 3"), ("Text 4", "Text 5", "Text 6"), ("Text 7", "Text 8", "Text 9")],
+        _items(page),
+    )
+    return slide
 
 
-def generate(template_path, content_data, output_path):
-    """直接接受 JSON 对象并生成 PPT。"""
+def build_process_4(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["process_4"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_triples(
+        slide,
+        [("Text 4", "Text 5", "Text 6"), ("Text 7", "Text 8", "Text 9"), ("Text 10", "Text 11", "Text 12"), ("Text 13", "Text 14", "Text 15")],
+        _items(page, "steps"),
+    )
+    return slide
+
+
+def build_pair_cards_2(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["pair_cards_2"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_triples(slide, [("Text 7", "Text 8", "Text 9"), ("Text 10", "Text 11", "Text 12")], _items(page))
+    return slide
+
+
+def build_columns_3(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["columns_3"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 7", "Text 8"), ("Text 9", "Text 10"), ("Text 11", "Text 12")], _items(page), False)
+    return slide
+
+
+def build_balanced_4(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["balanced_4"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 5", "Text 6"), ("Text 7", "Text 8"), ("Text 9", "Text 10"), ("Text 11", "Text 12")], _items(page), False)
+    return slide
+
+
+def build_dual_story(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["dual_story"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 5", "Text 6"), ("Text 7", "Text 8")], _items(page), False)
+    return slide
+
+
+def build_stacked_3(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["stacked_3"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_triples(
+        slide,
+        [("Text 1", "Text 2", "Text 3"), ("Text 4", "Text 5", "Text 6"), ("Text 7", "Text 8", "Text 9")],
+        _items(page),
+    )
+    return slide
+
+
+def build_quadrant_4(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["quadrant_4"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 2", "Text 3"), ("Text 4", "Text 5"), ("Text 6", "Text 7"), ("Text 8", "Text 9")], _items(page), False)
+    return slide
+
+
+def build_compare_2(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["compare_2"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_triples(slide, [("Text 5", "Text 6", "Text 7"), ("Text 8", "Text 9", "Text 10")], _items(page))
+    return slide
+
+
+def build_advantage_4(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["advantage_4"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_triples(
+        slide,
+        [("Text 8", "Text 9", "Text 10"), ("Text 11", "Text 12", "Text 13"), ("Text 14", "Text 15", "Text 16"), ("Text 17", "Text 18", "Text 19")],
+        _items(page),
+    )
+    return slide
+
+
+def build_service_3(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["service_3"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 5", "Text 6"), ("Text 7", "Text 8"), ("Text 9", "Text 10")], _items(page), False)
+    return slide
+
+
+def build_followup_4(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["followup_4"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 1", "Text 2"), ("Text 3", "Text 4"), ("Text 5", "Text 6"), ("Text 7", "Text 8")], _items(page), False)
+    return slide
+
+
+def build_followup_2(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["followup_2"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_triples(slide, [("Text 6", "Text 7", "Text 8"), ("Text 9", "Text 10", "Text 11")], _items(page))
+    return slide
+
+
+def build_followup_3(prs: Presentation, page: dict):
+    slide = copy_slide(prs, LAYOUTS["followup_3"])
+    set_shape_text(slide, "Text 0", page.get("title", ""))
+    _set_pairs(slide, [("Text 3", "Text 4"), ("Text 5", "Text 6"), ("Text 7", "Text 8")], _items(page), False)
+    return slide
+
+
+def build_ending(prs: Presentation, data: dict):
+    slide = copy_slide(prs, LAYOUTS["ending"])
+    set_shape_text(slide, "Text 4", data.get("thanks", "THANK YOU FOR READING！"))
+    set_shape_text(slide, "Text 2", data.get("message", "财务小变化、企业大未来"))
+    set_shape_text(slide, "Text 6", data.get("name", ""))
+    set_shape_text(slide, "Text 7", data.get("date", ""))
+    return slide
+
+
+def generate(template_path: str | Path, content_data: dict, output_path: str | Path) -> Path:
     prs = Presentation(str(template_path))
     original_count = len(prs.slides)
-    data = content_data
 
-    build_cover(prs, data["cover"])
+    build_cover(prs, content_data.get("cover") or {})
+    build_toc(prs, _section_titles(content_data))
 
-    for slide_data in data["slides"]:
-        slide_type = slide_data["type"]
-        if slide_type in BUILDERS:
-            BUILDERS[slide_type](prs, slide_data)
-        else:
-            print(f"⚠️ 未知类型：{slide_type}，已跳过")
+    builders = {
+        "focus_2": build_focus_2,
+        "levels_3": build_levels_3,
+        "insight_4": build_insight_4,
+        "duo_detail": build_duo_detail,
+        "numbered_3": build_numbered_3,
+        "process_4": build_process_4,
+        "pair_cards_2": build_pair_cards_2,
+        "columns_3": build_columns_3,
+        "balanced_4": build_balanced_4,
+        "dual_story": build_dual_story,
+        "stacked_3": build_stacked_3,
+        "quadrant_4": build_quadrant_4,
+        "compare_2": build_compare_2,
+        "advantage_4": build_advantage_4,
+        "service_3": build_service_3,
+        "followup_4": build_followup_4,
+        "followup_2": build_followup_2,
+        "followup_3": build_followup_3,
+    }
 
-    build_ending(prs, data["ending"])
+    sections = list(content_data.get("sections") or [])
+    for section_index, section in enumerate(sections):
+        build_section_cover(prs, section, section_index)
+        for page in section.get("pages") or []:
+            layout = str(page.get("layout") or "").strip().lower()
+            builder = builders.get(layout)
+            if builder is None:
+                print(f"[WARN] Unknown page layout: {layout}")
+                continue
+            builder(prs, page)
+
+    build_ending(prs, content_data.get("ending") or {})
     delete_original_slides(prs, original_count)
 
-    prs.save(str(output_path))
-    total = len(prs.slides)
-    print(f"✅ 生成成功：{output_path}，共 {total} 页")
-    return str(output_path)
+    final_path = Path(output_path)
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    prs.save(str(final_path))
+    print(f"[OK] PPT generated: {final_path.name}")
+    return final_path
 
 
-def generate_from_file(template_path, content_path, output_path):
-    """兼容原有用法：从 content.json 读取后生成 PPT。"""
+def generate_from_file(
+    template_path: str | Path = TEMPLATE,
+    content_path: str | Path = CONTENT,
+    output_path: str | Path = OUTPUT,
+) -> Path:
     return generate(template_path, load_content(content_path), output_path)
 
 
 if __name__ == "__main__":
-    base_dir = Path(__file__).resolve().parent
-    generate_from_file(base_dir / TEMPLATE, base_dir / CONTENT, base_dir / OUTPUT)
+    _configure_stdio()
+    generate_from_file()

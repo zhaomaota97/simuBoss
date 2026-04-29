@@ -46,9 +46,9 @@
           v-for="delivery in runtime.deliveries"
           :key="delivery.id"
           class="mb-3 w-full rounded-xl border border-slate-200 border-l-4 border-l-emerald-500 bg-white p-3 text-left shadow-sm"
-          @click="selectedDelivery = delivery"
+          @click="openDelivery(delivery)"
         >
-          <div class="text-sm font-semibold text-slate-800">{{ delivery.task }} - result.md</div>
+          <div class="text-sm font-semibold text-slate-800">{{ getDeliveryTitle(delivery) }}</div>
           <div class="mt-1 text-xs text-slate-500">{{ ui.processor }}{{ delivery.sender }}</div>
         </button>
       </div>
@@ -651,9 +651,29 @@
           <div class="rounded-2xl border border-slate-200 bg-white p-5">
             <div class="mb-4 flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div class="text-sm font-semibold text-slate-700">交付预览</div>
-              <div class="text-xs text-slate-400">Markdown Render</div>
+              <div class="text-xs text-slate-400">
+                {{ selectedDelivery.deliverable?.type === 'ppt' ? 'PPT Deliverable' : 'Markdown Render' }}
+              </div>
             </div>
             <div
+              v-if="selectedDelivery.deliverable?.type === 'ppt'"
+              class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            >
+              <div class="text-sm font-semibold text-slate-900">
+                {{ selectedDelivery.deliverable.fileName || 'result.pptx' }}
+              </div>
+              <div class="mt-2 text-sm text-slate-600">
+                {{ selectedDelivery.deliverable.summary || '已生成可下载的 PPT 文件。' }}
+              </div>
+              <button
+                class="mt-4 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white"
+                @click="downloadDeliveryFile(selectedDelivery)"
+              >
+                下载 PPT
+              </button>
+            </div>
+            <div
+              v-else
               class="prose prose-sm max-w-none prose-headings:mb-3 prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700 prose-pre:hidden"
               v-html="renderMarkdown(selectedDelivery.result)"
             />
@@ -739,6 +759,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import PlacementNode from '../components/canvas/PlacementNode.vue'
 import {
   Dialog,
@@ -798,11 +819,14 @@ const ui = {
 const DEFAULT_MANAGER_PLANNER = DEFAULT_SYSTEM_PROMPTS.managerPlanner
 const DEFAULT_MANAGER_SYNTHESIZER = DEFAULT_SYSTEM_PROMPTS.managerSynthesizer
 const DEFAULT_WORKER_PROMPT = DEFAULT_SYSTEM_PROMPTS.worker
+const sessionExpiredMessage = '登录已失效，请重新登录。'
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
 
 const store = useSimuBossStore()
 const authStore = useAuthStore()
 const runtime = useRuntimeStore()
 const assetLibrary = useAssetLibraryStore()
+const router = useRouter()
 const currentFloorId = ref(store.floors[0]?.id || 'floor-1')
 const floorRailRef = ref(null)
 const canvasShellRef = ref(null)
@@ -841,11 +865,7 @@ const floorCalloutStyle = computed(() =>
 const selectedEntitySourceId = computed(() => getEntityInfoSourceId(selectedEntity.value))
 const selectedEntityStatusText = computed(() => {
   if (!selectedEntity.value) return ui.idle
-  return (
-    runtime.teamStatuses[selectedEntitySourceId.value]?.text ||
-    runtime.teamStatuses[selectedEntity.value.id]?.text ||
-    ui.idle
-  )
+  return getEntityStatusText(selectedEntity.value)
 })
 const selectedEntityQueue = computed(() => {
   if (!selectedEntity.value) return []
@@ -870,29 +890,11 @@ const activeTaskFlow = computed(() =>
 const taskFlowOverlay = ref({ lines: [] })
 const selectedEntityStreamText = computed(() => {
   if (!selectedEntity.value) return '\u65e0\u5b9e\u65f6\u8f93\u51fa'
-  const sourceId = selectedEntitySourceId.value
-  const streamKeys = [...new Set([sourceId, `${sourceId}:dispatch`, `${sourceId}:synthesis`, selectedEntity.value.id])]
-  const chunks = streamKeys
-    .map((key) => {
-      const content = runtime.workerStates[key]?.streamedContent
-      if (!content) return ''
-      if (key === sourceId) return `main\n${content}`
-      return `${key.replace(`${sourceId}:`, '')}\n${content}`
-    })
-    .filter(Boolean)
-  return chunks.join('\n\n') || '\u65e0\u5b9e\u65f6\u8f93\u51fa'
+  return getStreamText(selectedEntity.value)
 })
 const selectedEntityTimeline = computed(() => {
   if (!selectedEntity.value) return []
-  const sourceId = selectedEntitySourceId.value
-  return runtime.logs.filter(
-    (entry) =>
-      entry.entityId === sourceId ||
-      entry.entityId === selectedEntity.value.id ||
-      entry.workerKey === sourceId ||
-      entry.workerKey === selectedEntity.value.id ||
-      String(entry.workerKey || '').startsWith(`${sourceId}:`),
-  )
+  return getEntityTimeline(selectedEntity.value)
 })
 const contentBounds = computed(() => {
   if (!currentPlacements.value.length) {
@@ -1032,6 +1034,17 @@ function setWorkerBusyState(placement, isWorking, currentTask = '', streamedCont
       ...(streamedContent !== null ? { streamedContent } : {}),
     })
   })
+}
+
+function findManagedPlacementById(placement, targetId) {
+  const queue = [...getManagedChildren(placement)]
+  while (queue.length) {
+    const current = queue.shift()
+    if (!current) continue
+    if (String(current.id) === String(targetId) || String(current.refId) === String(targetId)) return current
+    if (current.children?.length) queue.push(...current.children)
+  }
+  return null
 }
 
 function displayName(placement) {
@@ -1303,19 +1316,76 @@ function recordDelivery({
   })
 }
 
+function getDeliveryTitle(delivery) {
+  if (delivery?.deliverable?.type === 'ppt') {
+    return `${delivery.task} - ${delivery.deliverable.fileName || 'result.pptx'}`
+  }
+  return `${delivery.task} - result.md`
+}
+
+function openDelivery(delivery) {
+  if (delivery?.deliverable?.type === 'ppt') {
+    downloadDeliveryFile(delivery)
+    return
+  }
+  selectedDelivery.value = delivery
+}
+
+async function downloadDeliveryFile(delivery) {
+  const downloadUrl = delivery?.deliverable?.downloadUrl
+  if (!downloadUrl || !authStore.authToken) {
+    window.alert('当前交付物缺少可下载文件。')
+    return
+  }
+
+  const response = await fetch(`${apiBaseUrl}${downloadUrl}`, {
+    headers: {
+      Authorization: `Bearer ${authStore.authToken}`,
+    },
+  })
+
+  if (response.status === 401) {
+    await authStore.logout()
+    window.alert(sessionExpiredMessage)
+    await router.push({
+      path: '/login',
+      query: { redirect: router.currentRoute.value.fullPath, reason: 'expired' },
+    })
+    return
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    window.alert(text || '下载交付文件失败。')
+    return
+  }
+
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = delivery.deliverable.fileName || 'result.pptx'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
 function isExecutionError(text) {
   return String(text || '').startsWith('\u6267\u884c\u5f02\u5e38')
 }
 
 function getStreamText(placement) {
   const sourceId = getEntityInfoSourceId(placement)
-  const streamKeys = [...new Set([sourceId, `${sourceId}:dispatch`, `${sourceId}:synthesis`, placement.id])]
+  const streamKeys = getEntityStreamKeys(placement)
   const chunks = streamKeys
     .map((key) => {
       const content = runtime.workerStates[key]?.streamedContent
+      const keyText = String(key)
+      const sourceIdText = String(sourceId)
       if (!content) return ''
-      if (key === sourceId) return `main\n${content}`
-      return `${key.replace(`${sourceId}:`, '')}\n${content}`
+      if (keyText === sourceIdText) return `main\n${content}`
+      return `${keyText.replace(`${sourceIdText}:`, '')}\n${content}`
     })
     .filter(Boolean)
   return chunks.join('\n\n') || '\u65e0\u5b9e\u65f6\u8f93\u51fa'
@@ -1325,14 +1395,50 @@ function getEntityInfoSourceId(placement) {
   return placement?.infoSourceId || placement?.id
 }
 
+function getEntityWorkerKeys(placement) {
+  if (!placement) return []
+  return [...new Set([placement.id, placement.refId, getEntityInfoSourceId(placement)].filter(Boolean))]
+}
+
+function getEntityStreamKeys(placement) {
+  const sourceId = getEntityInfoSourceId(placement)
+  return [...new Set([...getEntityWorkerKeys(placement), `${sourceId}:dispatch`, `${sourceId}:synthesis`])]
+}
+
+function getActiveWorkerState(placement) {
+  const keys = getEntityWorkerKeys(placement)
+  return keys.map((key) => runtime.workerStates[key]).find((item) => item?.isWorking) || null
+}
+
 function getEntityStatusText(placement) {
   const sourceId = getEntityInfoSourceId(placement)
-  return runtime.teamStatuses[sourceId]?.text || runtime.teamStatuses[placement.id]?.text || ui.idle
+  const activeWorkerState = getActiveWorkerState(placement)
+  const teamStatus = runtime.teamStatuses[sourceId]?.text || runtime.teamStatuses[placement.id]?.text || ''
+  if (activeWorkerState?.isWorking) {
+    return activeWorkerState.currentTask || teamStatus || '执行中'
+  }
+  return teamStatus || ui.idle
 }
 
 function getEntityQueue(placement) {
   const sourceId = getEntityInfoSourceId(placement)
   return runtime.teamQueues[sourceId] || runtime.teamQueues[placement.id] || []
+}
+
+function getEntityTimeline(placement) {
+  const sourceId = getEntityInfoSourceId(placement)
+  const workerKeys = getEntityWorkerKeys(placement).map(String)
+  return runtime.logs.filter((entry) => {
+    const entityId = String(entry.entityId || '')
+    const workerKey = String(entry.workerKey || '')
+    return (
+      workerKeys.includes(entityId) ||
+      workerKeys.includes(workerKey) ||
+      entityId === sourceId ||
+      workerKey === sourceId ||
+      workerKey.startsWith(`${sourceId}:`)
+    )
+  })
 }
 
 function getEntityApprovals(placement) {
@@ -2008,9 +2114,18 @@ ${approvedDraft || '无审批草案，请基于总任务和直属下属清单给
   })
 }
 
-function buildBackendExecutionPlan(placement, task, approvedPlan) {
+function buildBackendExecutionPlan(placement, task, approvedPlan, sourceTask = null) {
   if (approvedPlan?.tasks?.length) return approvedPlan
   const context = getPlacementContext(placement)
+  if (context.role === 'manager' && context.fixedPlan?.tasks?.length) {
+    const fixedExecutionPlan = buildFixedPlanForPlacement(
+      placement,
+      task,
+      sourceTask,
+      context.fixedPlan,
+    )
+    if (fixedExecutionPlan?.tasks?.length) return fixedExecutionPlan
+  }
   return {
     summary: `执行任务：${task}`,
     deliverable: `完成“${task}”的交付结果`,
@@ -2080,7 +2195,14 @@ function buildAssigneeConfigMap(placement, executionPlan) {
 function appendBackendTimeline(placement, timeline = []) {
   timeline.forEach((entry) => {
     const role = entry.stage === 'received' ? 'sys' : entry.stage.includes('worker') ? 'wrk' : 'mgr'
-    runtime.log(role, `[${entry.actor}] ${entry.message}`, { entityId: placement.id })
+    const taskId = extractTaskIdFromTimelineMessage(entry.message)
+    const flowTask = taskId ? runtime.taskFlows[String(placement.id)]?.tasks?.[taskId] : null
+    const assigneePlacement = flowTask?.assigneeId ? findManagedPlacementById(placement, flowTask.assigneeId) : null
+    runtime.log(role, `[${entry.actor}] ${entry.message}`, {
+      entityId: placement.id,
+      workerKey: assigneePlacement?.id || flowTask?.assigneeId || '',
+      taskId: taskId || '',
+    })
   })
 }
 
@@ -2090,8 +2212,50 @@ function taskLabelForStream(stage, payload = {}) {
 }
 
 function handleRuntimeStreamEvent(placement, eventName, payload = {}) {
+  if (eventName === 'plan' && payload.plan) {
+    runtime.upsertTaskFlow(String(placement.id), payload.plan, {
+      rootId: String(placement.id),
+      rootName: displayName(placement),
+    })
+    scheduleTaskFlowOverlayUpdate()
+    return
+  }
+
   if (eventName === 'timeline' && payload.entry) {
     appendBackendTimeline(placement, [payload.entry])
+    const taskId = extractTaskIdFromTimelineMessage(payload.entry.message)
+    if (taskId && payload.entry.stage === 'worker') {
+      runtime.markTaskFlowTaskRunning(String(placement.id), taskId)
+      const flowTask = runtime.taskFlows[String(placement.id)]?.tasks?.[taskId]
+      const assigneePlacement = flowTask?.assigneeId
+        ? findManagedPlacementById(placement, flowTask.assigneeId)
+        : null
+      if (assigneePlacement) {
+        setWorkerBusyState(
+          assigneePlacement,
+          true,
+          flowTask.title || taskId,
+          runtime.workerStates[assigneePlacement.id]?.streamedContent || '',
+        )
+      }
+      scheduleTaskFlowOverlayUpdate()
+    }
+    if (taskId && payload.entry.stage === 'worker_done') {
+      runtime.markTaskFlowTaskDone(String(placement.id), taskId)
+      const flowTask = runtime.taskFlows[String(placement.id)]?.tasks?.[taskId]
+      const assigneePlacement = flowTask?.assigneeId
+        ? findManagedPlacementById(placement, flowTask.assigneeId)
+        : null
+      if (assigneePlacement) {
+        setWorkerBusyState(
+          assigneePlacement,
+          false,
+          flowTask.title || taskId,
+          runtime.workerStates[assigneePlacement.id]?.streamedContent || '',
+        )
+      }
+      scheduleTaskFlowOverlayUpdate()
+    }
     return
   }
 
@@ -2104,14 +2268,30 @@ function handleRuntimeStreamEvent(placement, eventName, payload = {}) {
         currentTask: taskLabelForStream(stage, payload),
       })
     } else {
-      setWorkerBusyState(placement, true, taskLabelForStream(stage, payload), payload.fullText || '')
+      const assigneePlacement = payload.assigneeId
+        ? findManagedPlacementById(placement, payload.assigneeId)
+        : null
+      setWorkerBusyState(
+        assigneePlacement || placement,
+        true,
+        taskLabelForStream(stage, payload),
+        payload.fullText || '',
+      )
     }
     return
   }
 
   if (eventName === 'worker_result' && payload.assignee_name) {
+    const assigneePlacement = payload.assignee_id
+      ? findManagedPlacementById(placement, payload.assignee_id)
+      : null
+    if (assigneePlacement) {
+      setWorkerBusyState(assigneePlacement, false, payload.title || '', payload.result || '')
+    }
     runtime.log('wrk', `[${payload.assignee_name}] 已产出结果 -> ${payload.title}`, {
       entityId: placement.id,
+      workerKey: assigneePlacement?.id || payload.assignee_id || '',
+      taskId: payload.task_id || '',
     })
   }
 }
@@ -2133,7 +2313,7 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
       throw new Error('未检测到后端登录态，请先重新登录')
     }
 
-    const executionPlan = buildBackendExecutionPlan(placement, task, approvedPlan)
+    const executionPlan = buildBackendExecutionPlan(placement, task, approvedPlan, sourceTask)
     const assigneeConfigs = buildAssigneeConfigMap(placement, executionPlan)
     const runtimeResult = await executeRuntimeTask({
       token: authStore.authToken,
@@ -2172,7 +2352,21 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
       })
     }
   } catch (error) {
-    result = `执行异常: ${error instanceof Error ? error.message : String(error || '')}`
+    const errorMessage = error instanceof Error ? error.message : String(error || '')
+    if (error?.status === 401 || error?.code === 'UNAUTHORIZED') {
+      await authStore.logout()
+      window.alert(sessionExpiredMessage)
+      await router.push({
+        path: '/login',
+        query: { redirect: router.currentRoute.value.fullPath, reason: 'expired' },
+      })
+      result = `执行异常: ${sessionExpiredMessage}`
+    } else {
+      runtime.log('sys', `任务执行异常详情 -> ${errorMessage}`, {
+        entityId: placement.id,
+      })
+      result = `执行异常: ${errorMessage}`
+    }
   }
 
   setWorkerBusyState(placement, false)

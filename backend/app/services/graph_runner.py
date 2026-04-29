@@ -59,78 +59,124 @@ class GraphRuntimeService:
         return """
 如果当前任务目标是输出 PPT 渲染 JSON，你必须只输出一个 JSON 对象，不要输出解释文字，不要输出 Markdown。
 
-顶层必须包含：
+这份 JSON 必须使用新的模板原生结构，顶层固定为：
 {
-  "cover": {"title": "封面标题", "subtitle": "封面副标题"},
-  "slides": [...],
-  "ending": {"name": "结尾页署名"}
-}
-
-slides 中每页 type 只能是以下之一，并且必须补齐对应字段：
-
-1. module
-{
-  "type": "module",
-  "module_no": "MODULE 01",
-  "module_name": "模块名",
-  "subtitle": "模块副标题",
-  "tagline": "模块标语"
-}
-
-2. three_cols
-{
-  "type": "three_cols",
-  "tag": "标签",
-  "title": "标题",
-  "cols": [
-    {"heading": "列1标题", "body": "列1正文", "quote": "列1引用"},
-    {"heading": "列2标题", "body": "列2正文", "quote": "列2引用"},
-    {"heading": "列3标题", "body": "列3正文", "quote": "列3引用"}
+  "cover": {"title": "封面标题", "subtitle": "封面副标题", "date": "日期"},
+  "sections": [
+    {
+      "id": "01",
+      "title": "章节标题",
+      "pages": [
+        {"layout": "...", "...": "..."}
+      ]
+    }
   ],
-  "footer": "页脚总结"
+  "ending": {"name": "结尾署名", "date": "日期"}
 }
 
-3. steps
+注意：
+1. 不要再输出 slides、module、three_cols、steps、numbered_list、four_grid 这些旧字段或旧页型。
+2. sections 最多 5 个，每个 section 会自动生成章节封面页。
+3. pages 中 layout 只能是以下之一：
+
+A. focus_2
 {
-  "type": "steps",
-  "tag": "标签",
-  "title": "标题",
-  "intro": "导语",
+  "layout": "focus_2",
+  "title": "页面标题",
+  "items": [
+    {"title": "模块1标题", "text": "模块1正文"},
+    {"title": "模块2标题", "text": "模块2正文"}
+  ]
+}
+
+B. levels_3 / numbered_3 / stacked_3
+{
+  "layout": "levels_3",
+  "title": "页面标题",
+  "items": [
+    {"label": "1", "title": "条目1标题", "text": "条目1正文"},
+    {"label": "2", "title": "条目2标题", "text": "条目2正文"},
+    {"label": "3", "title": "条目3标题", "text": "条目3正文"}
+  ]
+}
+
+C. insight_4 / balanced_4 / quadrant_4 / followup_4
+{
+  "layout": "insight_4",
+  "title": "页面标题",
+  "items": [
+    {"title": "条目1标题", "text": "条目1正文"},
+    {"title": "条目2标题", "text": "条目2正文"},
+    {"title": "条目3标题", "text": "条目3正文"},
+    {"title": "条目4标题", "text": "条目4正文"}
+  ]
+}
+
+D. duo_detail / dual_story
+{
+  "layout": "duo_detail",
+  "title": "页面标题",
+  "items": [
+    {"title": "左侧标题", "text": "左侧正文"},
+    {"title": "右侧标题", "text": "右侧正文"}
+  ]
+}
+
+E. process_4
+{
+  "layout": "process_4",
+  "title": "页面标题",
   "steps": [
-    {"step": "STEP 01", "phase": "阶段1", "action": "动作1", "detail_a": "细节A1", "detail_b": "细节B1"},
-    {"step": "STEP 02", "phase": "阶段2", "action": "动作2", "detail_a": "细节A2", "detail_b": "细节B2"},
-    {"step": "STEP 03", "phase": "阶段3", "action": "动作3", "detail_a": "细节A3", "detail_b": "细节B3"}
-  ],
-  "footer": "页脚总结"
+    {"label": "01", "title": "步骤1标题", "text": "步骤1正文"},
+    {"label": "02", "title": "步骤2标题", "text": "步骤2正文"},
+    {"label": "03", "title": "步骤3标题", "text": "步骤3正文"},
+    {"label": "04", "title": "步骤4标题", "text": "步骤4正文"}
+  ]
 }
 
-4. numbered_list
+F. pair_cards_2 / compare_2 / followup_2
 {
-  "type": "numbered_list",
-  "tag": "标签",
-  "title": "标题",
-  "intro": "导语",
+  "layout": "pair_cards_2",
+  "title": "页面标题",
   "items": [
-    {"no": "01", "heading": "条目1标题", "body": "条目1正文"},
-    {"no": "02", "heading": "条目2标题", "body": "条目2正文"},
-    {"no": "03", "heading": "条目3标题", "body": "条目3正文"}
-  ],
-  "footer": "页脚总结"
+    {"label": "01", "title": "模块1标题", "text": "模块1正文"},
+    {"label": "02", "title": "模块2标题", "text": "模块2正文"}
+  ]
 }
 
-5. four_grid
+G. columns_3 / service_3 / followup_3
 {
-  "type": "four_grid",
-  "tag": "标签",
-  "title": "标题",
+  "layout": "columns_3",
+  "title": "页面标题",
   "items": [
-    {"heading": "宫格1标题", "body": "宫格1正文", "quote": "宫格1引用"},
-    {"heading": "宫格2标题", "body": "宫格2正文", "quote": "宫格2引用"},
-    {"heading": "宫格3标题", "body": "宫格3正文", "quote": "宫格3引用"},
-    {"heading": "宫格4标题", "body": "宫格4正文", "quote": "宫格4引用"}
-  ],
-  "footer": "页脚总结"
+    {"title": "列1标题", "text": "列1正文"},
+    {"title": "列2标题", "text": "列2正文"},
+    {"title": "列3标题", "text": "列3正文"}
+  ]
 }
+
+H. advantage_4
+{
+  "layout": "advantage_4",
+  "title": "页面标题",
+  "items": [
+    {"label": "01", "title": "优势1标题", "text": "优势1正文"},
+    {"label": "02", "title": "优势2标题", "text": "优势2正文"},
+    {"label": "03", "title": "优势3标题", "text": "优势3正文"},
+    {"label": "04", "title": "优势4标题", "text": "优势4正文"}
+  ]
+}
+
+4. 目标是尽可能充分使用模板已启用的全部版式能力，但前提是版式与内容匹配。不要为了凑数量硬塞页面；如果某种 layout 不适合当前材料，就不要强行使用。
+5. 优先让每个 section 内出现不同类型的页面，避免整份 PPT 只反复使用少数几种 layout。
+6. 请尽量满足下面的“版式家族覆盖率”：
+   - 二分说明家族：focus_2 / duo_detail / dual_story 里至少用 1 种
+   - 三项表达家族：levels_3 / numbered_3 / stacked_3 / columns_3 / service_3 / followup_3 里至少用 2 种不同 layout
+   - 四项表达家族：insight_4 / balanced_4 / quadrant_4 / followup_4 里至少用 2 种不同 layout
+   - 流程家族：process_4 至少用 1 次
+   - 对比家族：pair_cards_2 / compare_2 至少用 1 种
+   - 优势总结家族：advantage_4 至少用 1 次
+7. 如果原始材料信息不足，允许你做合理归纳和轻度扩写来满足覆盖率，但不要编造具体事实、数字或案例。
 """
 
     def _default_plan_for(self, request: RuntimeTaskRequest) -> ExecutionPlan:
@@ -278,7 +324,8 @@ slides 中每页 type 只能是以下之一，并且必须补齐对应字段：
         source_material: str,
     ) -> str:
         extra_guidance = ""
-        if "content.json" in str(task.task or "").lower():
+        task_text = f"{task.title}\n{task.task}".lower()
+        if "json" in task_text and ("ppt" in task_text or "渲染" in task_text):
             extra_guidance = f"\n\n{self._ppt_content_schema_guidance()}"
         return f"""
 总任务：{request.task}
@@ -486,7 +533,7 @@ slides 中每页 type 只能是以下之一，并且必须补齐对应字段：
                 deliverable = None
                 config = self._assignee_config(request, task)
 
-                if self._is_direct_worker_execution(request) and config.get("executionMode") != "ppt_renderer":
+                if config.get("executionMode") != "ppt_renderer":
                     async for delta in self._stream_worker_task(request, task, dependency_text):
                         result_text += delta
                         yield _sse(
@@ -509,23 +556,6 @@ slides 中每页 type 只能是以下之一，并且必须补齐对应字段：
                         dependency_text,
                         deliveries_by_task_id,
                     )
-                    if config.get("executionMode") != "ppt_renderer":
-                        streamed_text = ""
-                        for delta in [result_text[i : i + 24] for i in range(0, len(result_text), 24)] or [""]:
-                            streamed_text += delta
-                            yield _sse(
-                                "chunk",
-                                {
-                                    "stage": "worker",
-                                    "taskId": task.id,
-                                    "assigneeId": task.assignee_id,
-                                    "actor": task.assignee_name or task.assignee_id,
-                                    "delta": delta,
-                                    "fullText": streamed_text,
-                                    "title": task.title,
-                                },
-                            )
-                            await asyncio.sleep(0)
 
                 worker_result = {
                     "task_id": task.id,

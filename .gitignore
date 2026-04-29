@@ -5,4 +5,10 @@ backend/.venv/
 __pycache__/
 *.py[cod]
 logs/
+backend/logs/
+backend/generated_ppt/
+ppt/*.pptx
+!ppt/caika-template.pptx
+outputs/
 .env
+node_modules
