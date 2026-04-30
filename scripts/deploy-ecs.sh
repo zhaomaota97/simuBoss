@@ -13,8 +13,11 @@ else
 fi
 
 cd "$APP_DIR"
-git fetch --all --prune
-git reset --hard "origin/${DEPLOY_BRANCH:-main}"
+
+if [ "${SKIP_GIT_PULL:-0}" != "1" ]; then
+  git fetch --all --prune
+  git reset --hard "origin/${DEPLOY_BRANCH:-main}"
+fi
 
 if [ ! -f .env.production ]; then
   echo ".env.production is missing. Create it from .env.production.example before deploying." >&2

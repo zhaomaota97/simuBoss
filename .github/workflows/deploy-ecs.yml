@@ -11,6 +11,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pack source
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='logs' \
+            --exclude='outputs' \
+            --exclude='backend/.venv' \
+            --exclude='backend/generated_ppt' \
+            --exclude='.env' \
+            --exclude='.env.production' \
+            -czf simuboss-release.tgz .
+
+      - name: Upload release archive
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          port: ${{ secrets.ECS_PORT || 22 }}
+          source: simuboss-release.tgz
+          target: /tmp
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -20,13 +47,19 @@ jobs:
           port: ${{ secrets.ECS_PORT || 22 }}
           script: |
             set -e
-            cd /opt/simuboss
-            git fetch --all --prune
-            git reset --hard origin/main
-            if docker compose version >/dev/null 2>&1; then
-              docker compose up -d --build
-              docker compose ps
-            else
-              docker-compose up -d --build
-              docker-compose ps
+            APP_DIR=/opt/simuboss
+            mkdir -p "$APP_DIR"
+            find "$APP_DIR" -mindepth 1 \
+              ! -name '.env.production' \
+              ! -name 'backend' \
+              -exec rm -rf {} +
+            if [ -d "$APP_DIR/backend" ]; then
+              find "$APP_DIR/backend" -mindepth 1 \
+                ! -name 'generated_ppt' \
+                ! -name 'simuboss.db' \
+                -exec rm -rf {} +
             fi
+            tar -xzf /tmp/simuboss-release.tgz -C "$APP_DIR"
+            rm -f /tmp/simuboss-release.tgz
+            cd "$APP_DIR"
+            SKIP_GIT_PULL=1 bash scripts/deploy-ecs.sh
