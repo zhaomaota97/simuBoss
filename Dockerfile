@@ -26,6 +26,7 @@ RUN apt-get update \
 
 COPY backend/pyproject.toml backend/README.md ./
 COPY backend/app ./app
+COPY ppt /app/ppt
 RUN pip install --no-cache-dir -e .
 
 RUN mkdir -p /app/backend/generated_ppt

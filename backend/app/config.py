@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     admin_username: str = "admin"
     admin_password: str = "123456"
+    session_ttl_hours: int = 24 * 7
 
     deepseek_api_key: str = Field(
         default="",

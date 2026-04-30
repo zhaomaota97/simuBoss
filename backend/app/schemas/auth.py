@@ -15,6 +15,7 @@ class LoginResponse(BaseModel):
     ok: bool = True
     token: str
     username: str
+    expires_in: int
 
 
 class MeResponse(BaseModel):

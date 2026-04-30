@@ -34,11 +34,16 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     token = uuid4().hex
     db.add(SessionToken(token=token, user_id=user.id, username=user.username))
     db.commit()
-    return LoginResponse(token=token, username=user.username)
+    return LoginResponse(
+        token=token,
+        username=user.username,
+        expires_in=settings.session_ttl_hours * 3600,
+    )
 
 
 @router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    settings = get_settings()
     username = payload.username.strip()
     if db.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="账号已存在")
@@ -51,7 +56,11 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     token = uuid4().hex
     db.add(SessionToken(token=token, user_id=user.id, username=user.username))
     db.commit()
-    return LoginResponse(token=token, username=user.username)
+    return LoginResponse(
+        token=token,
+        username=user.username,
+        expires_in=settings.session_ttl_hours * 3600,
+    )
 
 
 @router.post("/logout")
