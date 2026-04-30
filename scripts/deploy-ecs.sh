@@ -24,5 +24,9 @@ if [ ! -f .env.production ]; then
   exit 1
 fi
 
-"${COMPOSE[@]}" up -d --build
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+  "${COMPOSE[@]}" up -d --no-build
+else
+  "${COMPOSE[@]}" up -d --build
+fi
 "${COMPOSE[@]}" ps

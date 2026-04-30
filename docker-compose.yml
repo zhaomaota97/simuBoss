@@ -1,5 +1,6 @@
 services:
   web:
+    image: simuboss-web:latest
     build:
       context: .
       target: web
@@ -12,6 +13,7 @@ services:
       - "80:80"
 
   backend:
+    image: simuboss-backend:latest
     build:
       context: .
       target: backend

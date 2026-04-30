@@ -29,6 +29,13 @@ jobs:
             -czf "$RUNNER_TEMP/simuboss-release.tgz" .
           cp "$RUNNER_TEMP/simuboss-release.tgz" simuboss-release.tgz
 
+      - name: Build deployment images
+        run: |
+          docker build --target backend -t simuboss-backend:latest .
+          docker build --target web -t simuboss-web:latest .
+          docker pull postgres:16-alpine
+          docker save simuboss-backend:latest simuboss-web:latest postgres:16-alpine | gzip > simuboss-images.tar.gz
+
       - name: Upload release archive
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -36,7 +43,7 @@ jobs:
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           port: ${{ secrets.ECS_PORT || 22 }}
-          source: simuboss-release.tgz
+          source: "simuboss-release.tgz,simuboss-images.tar.gz"
           target: /tmp
 
       - name: Deploy over SSH
@@ -62,5 +69,7 @@ jobs:
             fi
             tar -xzf /tmp/simuboss-release.tgz -C "$APP_DIR"
             rm -f /tmp/simuboss-release.tgz
+            docker load -i /tmp/simuboss-images.tar.gz
+            rm -f /tmp/simuboss-images.tar.gz
             cd "$APP_DIR"
-            SKIP_GIT_PULL=1 bash scripts/deploy-ecs.sh
+            SKIP_GIT_PULL=1 SKIP_BUILD=1 bash scripts/deploy-ecs.sh
