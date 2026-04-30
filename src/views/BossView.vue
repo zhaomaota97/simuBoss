@@ -42,15 +42,49 @@
         <div v-if="!runtime.deliveries.length" class="pt-10 text-center text-xs text-slate-400">
           {{ ui.noDeliveries }}
         </div>
-        <button
+        <div
           v-for="delivery in runtime.deliveries"
           :key="delivery.id"
-          class="mb-3 w-full rounded-xl border border-slate-200 border-l-4 border-l-emerald-500 bg-white p-3 text-left shadow-sm"
+          role="button"
+          tabindex="0"
+          class="mb-3 w-full cursor-pointer rounded-xl border border-slate-200 border-l-4 bg-white p-3 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md"
+          :class="isPptDelivery(delivery) ? 'border-l-indigo-500' : 'border-l-emerald-500'"
           @click="openDelivery(delivery)"
+          @keydown.enter.prevent="openDelivery(delivery)"
+          @keydown.space.prevent="openDelivery(delivery)"
         >
-          <div class="text-sm font-semibold text-slate-800">{{ getDeliveryTitle(delivery) }}</div>
-          <div class="mt-1 text-xs text-slate-500">{{ ui.processor }}{{ delivery.sender }}</div>
-        </button>
+          <div class="flex items-start gap-3">
+            <div
+              class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+              :class="isPptDelivery(delivery) ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'"
+            >
+              <Presentation v-if="isPptDelivery(delivery)" class="h-4 w-4" />
+              <FileText v-else class="h-4 w-4" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-sm font-semibold text-slate-800">{{ getDeliveryTitle(delivery) }}</div>
+              <div class="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                <span>{{ ui.processor }}{{ delivery.sender }}</span>
+                <span
+                  class="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  :class="isPptDelivery(delivery) ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'"
+                >
+                  {{ isPptDelivery(delivery) ? 'PPT' : 'MD' }}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 disabled:cursor-wait disabled:opacity-60"
+              :disabled="isDownloadingDelivery(delivery)"
+              :title="isDownloadingDelivery(delivery) ? '正在准备下载' : '下载交付物'"
+              @click.stop="downloadDelivery(delivery)"
+            >
+              <Loader2 v-if="isDownloadingDelivery(delivery)" class="h-4 w-4 animate-spin" />
+              <FileDown v-else class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       </div>
       </template>
     </aside>
@@ -650,13 +684,34 @@
         <div class="scrollbar-thin flex-1 overflow-y-auto bg-slate-50 p-5">
           <div class="rounded-2xl border border-slate-200 bg-white p-5">
             <div class="mb-4 flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
-              <div class="text-sm font-semibold text-slate-700">交付预览</div>
-              <div class="text-xs text-slate-400">
-                {{ selectedDelivery.deliverable?.type === 'ppt' ? 'PPT Deliverable' : 'Markdown Render' }}
+              <div class="flex items-center gap-3">
+                <div
+                  class="flex h-9 w-9 items-center justify-center rounded-xl"
+                  :class="isPptDelivery(selectedDelivery) ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'"
+                >
+                  <Presentation v-if="isPptDelivery(selectedDelivery)" class="h-5 w-5" />
+                  <FileText v-else class="h-5 w-5" />
+                </div>
+                <div>
+                  <div class="text-sm font-semibold text-slate-700">交付预览</div>
+                  <div class="mt-0.5 text-xs text-slate-400">
+                    {{ isPptDelivery(selectedDelivery) ? 'PPT Deliverable' : 'Markdown Render' }}
+                  </div>
+                </div>
               </div>
+              <button
+                type="button"
+                class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 disabled:cursor-wait disabled:opacity-60"
+                :disabled="isDownloadingDelivery(selectedDelivery)"
+                @click="downloadDelivery(selectedDelivery)"
+              >
+                <Loader2 v-if="isDownloadingDelivery(selectedDelivery)" class="h-4 w-4 animate-spin" />
+                <FileDown v-else class="h-4 w-4" />
+                {{ getDownloadButtonText(selectedDelivery) }}
+              </button>
             </div>
             <div
-              v-if="selectedDelivery.deliverable?.type === 'ppt'"
+              v-if="isPptDelivery(selectedDelivery)"
               class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
             >
               <div class="text-sm font-semibold text-slate-900">
@@ -665,18 +720,22 @@
               <div class="mt-2 text-sm text-slate-600">
                 {{ selectedDelivery.deliverable.summary || '已生成可下载的 PPT 文件。' }}
               </div>
-              <button
-                class="mt-4 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white"
-                @click="downloadDeliveryFile(selectedDelivery)"
-              >
-                下载 PPT
-              </button>
+              <div v-if="isDownloadingDelivery(selectedDelivery)" class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+                正在准备 PPT 下载，请稍候...
+              </div>
             </div>
             <div
               v-else
-              class="prose prose-sm max-w-none prose-headings:mb-3 prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700 prose-pre:hidden"
-              v-html="renderMarkdown(selectedDelivery.result)"
-            />
+              class="space-y-4"
+            >
+              <div v-if="isDownloadingDelivery(selectedDelivery)" class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                正在准备 Markdown 下载，请稍候...
+              </div>
+              <div
+                class="prose prose-sm max-w-none prose-headings:mb-3 prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700 prose-pre:hidden"
+                v-html="renderMarkdown(selectedDelivery.result)"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -759,6 +818,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { FileDown, FileText, Loader2, Presentation } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import PlacementNode from '../components/canvas/PlacementNode.vue'
 import {
@@ -853,6 +913,7 @@ const approvalEditMode = ref(false)
 const approvalTaskCollapse = ref({})
 const rejectModalOpen = ref(false)
 const rejectFeedback = ref('')
+const downloadingDeliveryIds = ref({})
 const processingSet = new Set()
 
 const taskCards = ref([
@@ -1325,52 +1386,109 @@ function getDeliveryTitle(delivery) {
   return `${delivery.task} - result.md`
 }
 
-function openDelivery(delivery) {
-  if (delivery?.deliverable?.type === 'ppt') {
-    downloadDeliveryFile(delivery)
-    return
+function isPptDelivery(delivery) {
+  return delivery?.deliverable?.type === 'ppt'
+}
+
+function getDeliveryDownloadId(delivery) {
+  return delivery?.id || `${delivery?.task || 'delivery'}:${delivery?.createdAt || ''}`
+}
+
+function isDownloadingDelivery(delivery) {
+  return Boolean(downloadingDeliveryIds.value[getDeliveryDownloadId(delivery)])
+}
+
+function setDownloadingDelivery(delivery, value) {
+  const id = getDeliveryDownloadId(delivery)
+  if (!id) return
+  downloadingDeliveryIds.value = {
+    ...downloadingDeliveryIds.value,
+    [id]: value,
   }
+  if (!value) {
+    const next = { ...downloadingDeliveryIds.value }
+    delete next[id]
+    downloadingDeliveryIds.value = next
+  }
+}
+
+function getDownloadButtonText(delivery) {
+  if (isDownloadingDelivery(delivery)) return '下载中...'
+  return isPptDelivery(delivery) ? '下载 PPT' : '下载 MD'
+}
+
+function openDelivery(delivery) {
   selectedDelivery.value = delivery
 }
 
+function downloadDelivery(delivery) {
+  if (isPptDelivery(delivery)) {
+    return downloadDeliveryFile(delivery)
+  }
+  return downloadMarkdownDelivery(delivery)
+}
+
+function triggerBrowserDownload(blob, filename) {
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
+async function downloadMarkdownDelivery(delivery) {
+  if (isDownloadingDelivery(delivery)) return
+  setDownloadingDelivery(delivery, true)
+  try {
+    const blob = new Blob([String(delivery?.result || '')], {
+      type: 'text/markdown;charset=utf-8',
+    })
+    triggerBrowserDownload(blob, `${getDeliveryTitle(delivery).replace(/[\\/:*?"<>|]+/g, '-')}`)
+  } finally {
+    setDownloadingDelivery(delivery, false)
+  }
+}
+
 async function downloadDeliveryFile(delivery) {
+  if (isDownloadingDelivery(delivery)) return
   const downloadUrl = delivery?.deliverable?.downloadUrl
   if (!downloadUrl || !authStore.authToken) {
     window.alert('当前交付物缺少可下载文件。')
     return
   }
 
-  const response = await fetch(`${apiBaseUrl}${downloadUrl}`, {
-    headers: {
-      Authorization: `Bearer ${authStore.authToken}`,
-    },
-  })
-
-  if (response.status === 401) {
-    await authStore.logout()
-    window.alert(sessionExpiredMessage)
-    await router.push({
-      path: '/login',
-      query: { redirect: router.currentRoute.value.fullPath, reason: 'expired' },
+  setDownloadingDelivery(delivery, true)
+  try {
+    const response = await fetch(`${apiBaseUrl}${downloadUrl}`, {
+      headers: {
+        Authorization: `Bearer ${authStore.authToken}`,
+      },
     })
-    return
-  }
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    window.alert(text || '下载交付文件失败。')
-    return
-  }
+    if (response.status === 401) {
+      await authStore.logout()
+      window.alert(sessionExpiredMessage)
+      await router.push({
+        path: '/login',
+        query: { redirect: router.currentRoute.value.fullPath, reason: 'expired' },
+      })
+      return
+    }
 
-  const blob = await response.blob()
-  const objectUrl = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = objectUrl
-  link.download = delivery.deliverable.fileName || 'result.pptx'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(objectUrl)
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      window.alert(text || '下载交付文件失败。')
+      return
+    }
+
+    const blob = await response.blob()
+    triggerBrowserDownload(blob, delivery.deliverable.fileName || 'result.pptx')
+  } finally {
+    setDownloadingDelivery(delivery, false)
+  }
 }
 
 function isExecutionError(text) {
