@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { createDebouncedWorkspaceSaver } from '../services/api'
 import { cloneDeep } from '../utils/tree'
+import { createId } from '../utils/id'
 
 const DEFAULT_ASSETS = [
   {
@@ -48,7 +49,7 @@ function summarize(text, max = 96) {
 function normalizeAsset(payload = {}) {
   const now = new Date().toISOString()
   return {
-    id: payload.id || crypto.randomUUID(),
+    id: payload.id || createId(),
     kind: payload.kind || 'knowledge',
     title: String(payload.title || '').trim() || '未命名资产',
     summary: String(payload.summary || '').trim(),

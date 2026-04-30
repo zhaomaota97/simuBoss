@@ -259,6 +259,7 @@ import {
   getPlacementDesignHeight,
   getPlacementDesignWidth,
 } from '../utils/placementBounds'
+import { createId } from '../utils/id'
 import { cloneDeep, resolveNode } from '../utils/tree'
 import { useSimuBossStore } from '../stores/simuBoss'
 
@@ -343,7 +344,7 @@ const isDirty = computed(
 )
 
 function pushToast(title, message = '', type = 'info') {
-  const id = crypto.randomUUID()
+  const id = createId()
   toasts.value.push({ id, title, message, type })
   window.setTimeout(() => {
     toasts.value = toasts.value.filter((item) => item.id !== id)
@@ -438,7 +439,7 @@ function getSavedCount(floorId) {
 }
 
 function nextDraftId() {
-  return `draft-${crypto.randomUUID()}`
+  return createId('draft')
 }
 
 function hasManagerInRawNodes(nodes, managerId) {

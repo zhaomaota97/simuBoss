@@ -3,12 +3,13 @@ import { watch } from 'vue'
 import { defineStore } from 'pinia'
 import { streamChatCompletion } from '../services/llm'
 import { createDebouncedWorkspaceSaver } from '../services/api'
+import { createId } from '../utils/id'
 
 export const useRuntimeStore = defineStore('runtime', () => {
   const approvals = ref([])
   const deliveries = ref([])
   const logs = ref([
-    { id: crypto.randomUUID(), role: 'sys', text: '系统启动完成，已同步本地数据。' },
+    { id: createId(), role: 'sys', text: '系统启动完成，已同步本地数据。' },
   ])
   const teamQueues = ref({})
   const teamStatuses = ref({})
@@ -35,7 +36,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     deliveries.value = Array.isArray(data.deliveries) ? data.deliveries : []
     logs.value = Array.isArray(data.logs) && data.logs.length
       ? data.logs
-      : [{ id: crypto.randomUUID(), role: 'sys', text: '系统启动完成，已同步数据库数据。' }]
+      : [{ id: createId(), role: 'sys', text: '系统启动完成，已同步数据库数据。' }]
     teamQueues.value = data.teamQueues && typeof data.teamQueues === 'object' ? data.teamQueues : {}
     teamStatuses.value = data.teamStatuses && typeof data.teamStatuses === 'object' ? data.teamStatuses : {}
     workerStates.value = data.workerStates && typeof data.workerStates === 'object' ? data.workerStates : {}
@@ -58,7 +59,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
   const approvalCount = computed(() => approvals.value.length)
 
   function log(role, text, meta = {}) {
-    logs.value.push({ id: crypto.randomUUID(), role, text, time: new Date(), ...meta })
+    logs.value.push({ id: createId(), role, text, time: new Date(), ...meta })
   }
 
   function ensureTeamQueue(teamId) {
@@ -91,7 +92,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
       [teamId]: [
         ...queue,
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           task,
           payload,
         },
@@ -111,7 +112,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
 
   function createApproval(entry) {
     approvals.value.unshift({
-      id: crypto.randomUUID(),
+      id: createId(),
       createdAt: Date.now(),
       feedback: '',
       ...entry,
@@ -124,7 +125,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
 
   function addDelivery(entry) {
     deliveries.value.unshift({
-      id: crypto.randomUUID(),
+      id: createId(),
       createdAt: Date.now(),
       ...entry,
     })
@@ -307,7 +308,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
   function clearRuntime() {
     approvals.value = []
     deliveries.value = []
-    logs.value = [{ id: crypto.randomUUID(), role: 'sys', text: '系统运行态已重置。' }]
+    logs.value = [{ id: createId(), role: 'sys', text: '系统运行态已重置。' }]
     teamQueues.value = {}
     teamStatuses.value = {}
     workerStates.value = {}

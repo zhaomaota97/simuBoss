@@ -291,6 +291,7 @@ import {
   getPlacementDesignHeight,
   getPlacementDesignWidth,
 } from '../utils/placementBounds'
+import { createId } from '../utils/id'
 import { resolveNode } from '../utils/tree'
 import { useSimuBossStore } from '../stores/simuBoss'
 
@@ -420,7 +421,7 @@ function togglePanel(key) {
 }
 
 function nextDraftId() {
-  return `team-draft-${crypto.randomUUID()}`
+  return createId('team-draft')
 }
 
 function buildPlacementFromResolved(node, rawNode = null) {

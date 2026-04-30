@@ -775,6 +775,7 @@ import { executeRuntimeTask } from '../services/backendRuntime'
 import { useAssetLibraryStore } from '../stores/assetLibrary'
 import { useAuthStore } from '../stores/auth'
 import { getPlacementBounds } from '../utils/placementBounds'
+import { createId } from '../utils/id'
 import { findRootManagerNode, flattenWorkerNodes, resolveNode } from '../utils/tree'
 import { useRuntimeStore } from '../stores/runtime'
 import { useSimuBossStore } from '../stores/simuBoss'
@@ -855,7 +856,7 @@ const rejectFeedback = ref('')
 const processingSet = new Set()
 
 const taskCards = ref([
-  { id: crypto.randomUUID(), title: '\u65b0\u80fd\u6e90\u7ade\u54c1\u6df1\u5ea6\u5206\u6790\u62a5\u544a' },
+  { id: createId(), title: '\u65b0\u80fd\u6e90\u7ade\u54c1\u6df1\u5ea6\u5206\u6790\u62a5\u544a' },
 ])
 
 const currentPlacements = computed(() => store.floorAssignments[currentFloorId.value] || [])
@@ -974,7 +975,7 @@ function cloneValue(value) {
 }
 
 function nextLocalId(prefix) {
-  return `${prefix}-${crypto.randomUUID()}`
+  return createId(prefix)
 }
 
 function buildTreeFromRaw(nodes, scope = 'tree', branch = 'root') {
@@ -1226,12 +1227,12 @@ function getManagedChildren(placement) {
 }
 
 function createTaskCard(title) {
-  return { id: crypto.randomUUID(), kind: 'text', title, text: title }
+  return { id: createId(), kind: 'text', title, text: title }
 }
 
 function createWordTaskCard(file, base64) {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     kind: 'word',
     title: file.name,
     fileName: file.name,
@@ -2327,7 +2328,7 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
         approvedDraft,
         taskInput:
           sourceTask || {
-            id: `task-${crypto.randomUUID()}`,
+            id: createId('task'),
             kind: 'text',
             title: task,
             text: task,
