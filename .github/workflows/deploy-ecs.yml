@@ -26,7 +26,8 @@ jobs:
             --exclude='backend/generated_ppt' \
             --exclude='.env' \
             --exclude='.env.production' \
-            -czf simuboss-release.tgz .
+            -czf "$RUNNER_TEMP/simuboss-release.tgz" .
+          cp "$RUNNER_TEMP/simuboss-release.tgz" simuboss-release.tgz
 
       - name: Upload release archive
         uses: appleboy/scp-action@v0.1.7
