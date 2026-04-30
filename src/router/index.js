@@ -27,6 +27,9 @@ router.beforeEach(async (to) => {
   if (!authStore.isLoggedIn && authStore.session?.token) {
     await authStore.restoreSession()
   }
+  if (authStore.isLoggedIn) {
+    await authStore.ensureWorkspaceLoaded()
+  }
 
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     return {

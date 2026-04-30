@@ -2,7 +2,7 @@ import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { apiRequest } from '../services/api'
-import { clearWorkspaceLoadState, loadUserWorkspace } from '../services/workspace'
+import { clearWorkspaceLoadState, isWorkspaceLoaded, loadUserWorkspace } from '../services/workspace'
 
 export const useAuthStore = defineStore('auth', () => {
   const session = useStorage('sb_auth_session', {
@@ -95,6 +95,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function ensureWorkspaceLoaded() {
+    if (!session.value?.token || isWorkspaceLoaded()) return true
+    try {
+      await loadUserWorkspace({ token: session.value.token })
+      return true
+    } catch {
+      session.value = {
+        loggedIn: false,
+        username: '',
+        token: '',
+      }
+      clearWorkspaceLoadState()
+      return false
+    }
+  }
+
   async function logout() {
     const token = session.value?.token
     try {
@@ -127,5 +143,6 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     restoreSession,
+    ensureWorkspaceLoaded,
   }
 })

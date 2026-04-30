@@ -834,6 +834,7 @@ import { getApiBaseUrl } from '../services/api'
 import { executeRuntimeTask } from '../services/backendRuntime'
 import { useAssetLibraryStore } from '../stores/assetLibrary'
 import { useAuthStore } from '../stores/auth'
+import { useMessageStore } from '../stores/messages'
 import { getPlacementBounds } from '../utils/placementBounds'
 import { createId } from '../utils/id'
 import { findRootManagerNode, flattenWorkerNodes, resolveNode } from '../utils/tree'
@@ -889,6 +890,7 @@ const authStore = useAuthStore()
 const runtime = useRuntimeStore()
 const assetLibrary = useAssetLibraryStore()
 const router = useRouter()
+const messages = useMessageStore()
 const currentFloorId = ref(store.floors[0]?.id || 'floor-1')
 const floorRailRef = ref(null)
 const canvasShellRef = ref(null)
@@ -1326,7 +1328,7 @@ async function handleWordUpload(event) {
     const base64 = await fileToBase64(file)
     taskCards.value.unshift(createWordTaskCard(file, base64))
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : 'Word 文件读取失败')
+    messages.error('Word 文件读取失败', error instanceof Error ? error.message : '请重新选择文件。')
   } finally {
     event.target.value = ''
   }
@@ -1413,7 +1415,7 @@ function setDownloadingDelivery(delivery, value) {
 }
 
 function getDownloadButtonText(delivery) {
-  if (isDownloadingDelivery(delivery)) return '下载中...'
+  if (isDownloadingDelivery(delivery)) return '准备中...'
   return isPptDelivery(delivery) ? '下载 PPT' : '下载 MD'
 }
 
@@ -1439,14 +1441,40 @@ function triggerBrowserDownload(blob, filename) {
   URL.revokeObjectURL(objectUrl)
 }
 
+function retireMessage(id, delay) {
+  window.setTimeout(() => messages.remove(id), delay)
+}
+
 async function downloadMarkdownDelivery(delivery) {
   if (isDownloadingDelivery(delivery)) return
   setDownloadingDelivery(delivery, true)
+  const messageId = messages.push({
+    type: 'loading',
+    title: '正在准备 Markdown 下载',
+    message: '文件准备完成后会自动保存到浏览器下载目录。',
+    persistent: true,
+  })
   try {
     const blob = new Blob([String(delivery?.result || '')], {
       type: 'text/markdown;charset=utf-8',
     })
-    triggerBrowserDownload(blob, `${getDeliveryTitle(delivery).replace(/[\\/:*?"<>|]+/g, '-')}`)
+    const filename = `${getDeliveryTitle(delivery).replace(/[\\/:*?"<>|]+/g, '-')}`
+    triggerBrowserDownload(blob, filename)
+    messages.update(messageId, {
+      type: 'success',
+      title: 'Markdown 下载已开始',
+      message: filename,
+      persistent: false,
+    })
+    retireMessage(messageId, 3200)
+  } catch (error) {
+    messages.update(messageId, {
+      type: 'error',
+      title: 'Markdown 下载失败',
+      message: error instanceof Error ? error.message : '请稍后重试。',
+      persistent: false,
+    })
+    retireMessage(messageId, 5200)
   } finally {
     setDownloadingDelivery(delivery, false)
   }
@@ -1456,11 +1484,17 @@ async function downloadDeliveryFile(delivery) {
   if (isDownloadingDelivery(delivery)) return
   const downloadUrl = delivery?.deliverable?.downloadUrl
   if (!downloadUrl || !authStore.authToken) {
-    window.alert('当前交付物缺少可下载文件。')
+    messages.error('无法下载交付物', '当前交付物缺少可下载文件。')
     return
   }
 
   setDownloadingDelivery(delivery, true)
+  const messageId = messages.push({
+    type: 'loading',
+    title: '正在准备 PPT 下载',
+    message: 'PPT 文件较大时可能需要等待几十秒，你可以继续查看页面，完成后会自动保存。',
+    persistent: true,
+  })
   try {
     const response = await fetch(`${apiBaseUrl}${downloadUrl}`, {
       headers: {
@@ -1470,7 +1504,13 @@ async function downloadDeliveryFile(delivery) {
 
     if (response.status === 401) {
       await authStore.logout()
-      window.alert(sessionExpiredMessage)
+      messages.update(messageId, {
+        type: 'error',
+        title: '登录已失效',
+        message: sessionExpiredMessage,
+        persistent: false,
+      })
+      retireMessage(messageId, 5200)
       await router.push({
         path: '/login',
         query: { redirect: router.currentRoute.value.fullPath, reason: 'expired' },
@@ -1480,12 +1520,34 @@ async function downloadDeliveryFile(delivery) {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '')
-      window.alert(text || '下载交付文件失败。')
+      messages.update(messageId, {
+        type: 'error',
+        title: 'PPT 下载失败',
+        message: text || '请稍后重试。',
+        persistent: false,
+      })
+      retireMessage(messageId, 5200)
       return
     }
 
     const blob = await response.blob()
-    triggerBrowserDownload(blob, delivery.deliverable.fileName || 'result.pptx')
+    const filename = delivery.deliverable.fileName || 'result.pptx'
+    triggerBrowserDownload(blob, filename)
+    messages.update(messageId, {
+      type: 'success',
+      title: 'PPT 下载已开始',
+      message: filename,
+      persistent: false,
+    })
+    retireMessage(messageId, 3200)
+  } catch (error) {
+    messages.update(messageId, {
+      type: 'error',
+      title: 'PPT 下载失败',
+      message: error instanceof Error ? error.message : '网络异常，请稍后重试。',
+      persistent: false,
+    })
+    retireMessage(messageId, 5200)
   } finally {
     setDownloadingDelivery(delivery, false)
   }
@@ -1590,7 +1652,7 @@ function assignTask(placement, taskCard) {
   if (!matchesActivationType(placement, taskCard)) {
     const message = getTaskInputRejectionText(placement, taskCard)
     runtime.log('sys', message, { entityId: placement.id })
-    window.alert(message)
+    messages.error('无法分配任务', message)
     return
   }
   runtime.ensureTeamQueue(placement.id)
@@ -1658,7 +1720,7 @@ async function approveApproval(approval) {
   const children = getManagedChildren(approvalSnapshot.nodeSnapshot)
   const validationError = validateApprovalPlan(approvalSnapshot.plan, children)
   if (validationError) {
-    window.alert(`审批内容仍不合法：${validationError}`)
+    messages.error('审批内容仍不合法', validationError)
     return
   }
 
@@ -2475,7 +2537,7 @@ async function executeTask(placement, task, approvedDraft = '', options = {}) {
     const errorMessage = error instanceof Error ? error.message : String(error || '')
     if (error?.status === 401 || error?.code === 'UNAUTHORIZED') {
       await authStore.logout()
-      window.alert(sessionExpiredMessage)
+      messages.error('登录已失效', sessionExpiredMessage)
       await router.push({
         path: '/login',
         query: { redirect: router.currentRoute.value.fullPath, reason: 'expired' },

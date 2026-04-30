@@ -1,5 +1,6 @@
 <template>
   <div class="flex h-full min-h-0 flex-col bg-slate-50">
+    <MessageToaster />
     <header
       v-if="showShell"
       class="flex h-14 items-center border-b-2 border-brand-500 bg-slate-950 px-5 text-white"
@@ -78,6 +79,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
+import MessageToaster from './components/common/MessageToaster.vue'
 import { useAssetLibraryStore } from './stores/assetLibrary'
 import { useAuthStore } from './stores/auth'
 import { useRuntimeStore } from './stores/runtime'
