@@ -1,6 +1,6 @@
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { useStorage } from '@vueuse/core'
+import { createDebouncedWorkspaceSaver } from '../services/api'
 import { cloneDeep } from '../utils/tree'
 
 const DEFAULT_ASSETS = [
@@ -68,7 +68,32 @@ function normalizeAsset(payload = {}) {
 }
 
 export const useAssetLibraryStore = defineStore('assetLibrary', () => {
-  const assets = useStorage('sb_assets', cloneDeep(DEFAULT_ASSETS))
+  const assets = ref(cloneDeep(DEFAULT_ASSETS))
+  const persistenceReady = ref(false)
+
+  function serialize() {
+    return {
+      assets: cloneDeep(assets.value),
+    }
+  }
+
+  function hydrate(data = {}) {
+    persistenceReady.value = false
+    assets.value = Array.isArray(data.assets) ? cloneDeep(data.assets) : cloneDeep(DEFAULT_ASSETS)
+    window.setTimeout(() => {
+      persistenceReady.value = true
+    }, 0)
+  }
+
+  const scheduleSave = createDebouncedWorkspaceSaver('assets', serialize)
+
+  watch(
+    assets,
+    () => {
+      if (persistenceReady.value) scheduleSave()
+    },
+    { deep: true },
+  )
 
   const sortedAssets = computed(() =>
     [...assets.value].sort(
@@ -170,10 +195,13 @@ export const useAssetLibraryStore = defineStore('assetLibrary', () => {
 
   function resetAssets() {
     assets.value = cloneDeep(DEFAULT_ASSETS)
+    if (persistenceReady.value) scheduleSave()
   }
 
   return {
     assets,
+    serialize,
+    hydrate,
     sortedAssets,
     knowledgeAssets,
     deliverableAssets,

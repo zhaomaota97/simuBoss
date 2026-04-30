@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { useStorage } from '@vueuse/core'
 import { SEED_ROLE_PROMPTS } from '../config/prompts'
+import { createDebouncedWorkspaceSaver } from '../services/api'
 import { cloneDeep, getTeamDesc } from '../utils/tree'
 
 const STORAGE_VERSION = 'boss-sim-seed-v2'
@@ -339,16 +339,45 @@ const DEFAULT_FLOOR_ASSIGNMENTS = {
 }
 
 export const useSimuBossStore = defineStore('simuBoss', () => {
-  const seedVersion = useStorage('sb_seed_version', '')
-  const employees = useStorage('sb_emps', cloneDeep(DEFAULT_EMPS))
-  const teams = useStorage('sb_teams', cloneDeep(DEFAULT_TEAMS))
-  const floors = useStorage('sb_floors', cloneDeep(DEFAULT_FLOORS))
-  const canvasLayouts = useStorage('sb_canvas_layouts', cloneDeep(DEFAULT_CANVAS))
-  const floorAssignments = useStorage(
-    'sb_floor_assignments',
-    cloneDeep(DEFAULT_FLOOR_ASSIGNMENTS),
-  )
+  const seedVersion = ref(STORAGE_VERSION)
+  const employees = ref(cloneDeep(DEFAULT_EMPS))
+  const teams = ref(cloneDeep(DEFAULT_TEAMS))
+  const floors = ref(cloneDeep(DEFAULT_FLOORS))
+  const canvasLayouts = ref(cloneDeep(DEFAULT_CANVAS))
+  const floorAssignments = ref(cloneDeep(DEFAULT_FLOOR_ASSIGNMENTS))
   const nextIdSeed = ref(Date.now())
+  const persistenceReady = ref(false)
+
+  function serialize() {
+    return {
+      seedVersion: seedVersion.value,
+      employees: cloneDeep(employees.value),
+      teams: cloneDeep(teams.value),
+      floors: cloneDeep(floors.value),
+      canvasLayouts: cloneDeep(canvasLayouts.value),
+      floorAssignments: cloneDeep(floorAssignments.value),
+    }
+  }
+
+  function hydrate(data = {}) {
+    persistenceReady.value = false
+    seedVersion.value = data.seedVersion || STORAGE_VERSION
+    employees.value = Array.isArray(data.employees) ? cloneDeep(data.employees) : cloneDeep(DEFAULT_EMPS)
+    teams.value = Array.isArray(data.teams) ? cloneDeep(data.teams) : cloneDeep(DEFAULT_TEAMS)
+    floors.value = Array.isArray(data.floors) && data.floors.length ? cloneDeep(data.floors) : cloneDeep(DEFAULT_FLOORS)
+    canvasLayouts.value = data.canvasLayouts && typeof data.canvasLayouts === 'object'
+      ? cloneDeep(data.canvasLayouts)
+      : cloneDeep(DEFAULT_CANVAS)
+    floorAssignments.value = data.floorAssignments && typeof data.floorAssignments === 'object'
+      ? cloneDeep(data.floorAssignments)
+      : cloneDeep(DEFAULT_FLOOR_ASSIGNMENTS)
+    ensureFloorScopedState()
+    window.setTimeout(() => {
+      persistenceReady.value = true
+    }, 0)
+  }
+
+  const scheduleSave = createDebouncedWorkspaceSaver('simuboss', serialize)
 
   function resetSeedData() {
     employees.value = cloneDeep(DEFAULT_EMPS)
@@ -357,10 +386,7 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
     canvasLayouts.value = cloneDeep(DEFAULT_CANVAS)
     floorAssignments.value = cloneDeep(DEFAULT_FLOOR_ASSIGNMENTS)
     seedVersion.value = STORAGE_VERSION
-  }
-
-  if (seedVersion.value !== STORAGE_VERSION) {
-    resetSeedData()
+    if (persistenceReady.value) scheduleSave()
   }
 
   function ensureFloorScopedState() {
@@ -387,6 +413,14 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
       ensureFloorScopedState()
     },
     { deep: true, immediate: true },
+  )
+
+  watch(
+    [employees, teams, floors, canvasLayouts, floorAssignments],
+    () => {
+      if (persistenceReady.value) scheduleSave()
+    },
+    { deep: true },
   )
 
   const employeeMap = computed(() =>
@@ -731,6 +765,8 @@ export const useSimuBossStore = defineStore('simuBoss', () => {
     floors,
     canvasLayouts,
     floorAssignments,
+    serialize,
+    hydrate,
     employeeMap,
     teamMap,
     resetSeedData,

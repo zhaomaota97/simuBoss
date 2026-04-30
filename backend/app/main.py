@@ -6,7 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes_auth import router as auth_router
 from app.api.routes_health import router as health_router
 from app.api.routes_runtime import router as runtime_router
+from app.api.routes_workspace import router as workspace_router
 from app.config import get_settings
+from app.db import init_db
 
 settings = get_settings()
 
@@ -20,6 +22,7 @@ def _configure_stdio() -> None:
 
 
 _configure_stdio()
+init_db()
 
 app = FastAPI(
     title=settings.app_name,
@@ -45,6 +48,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(runtime_router)
+app.include_router(workspace_router)
 
 
 @app.get("/")

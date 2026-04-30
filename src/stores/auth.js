@@ -1,24 +1,8 @@
 import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
-
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
-
-async function request(path, options = {}) {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  })
-
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    throw new Error(data.detail || `Request failed with ${response.status}`)
-  }
-  return data
-}
+import { apiRequest } from '../services/api'
+import { clearWorkspaceLoadState, loadUserWorkspace } from '../services/workspace'
 
 export const useAuthStore = defineStore('auth', () => {
   const session = useStorage('sb_auth_session', {
@@ -33,8 +17,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(usernameInput, passwordInput) {
     try {
-      const data = await request('/auth/login', {
+      const data = await apiRequest('/auth/login', {
         method: 'POST',
+        token: '',
         body: JSON.stringify({
           username: String(usernameInput || '').trim(),
           password: String(passwordInput || ''),
@@ -46,6 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
         username: data.username,
         token: data.token,
       }
+      await loadUserWorkspace({ force: true, token: data.token })
 
       return { ok: true }
     } catch (error) {
@@ -56,10 +42,37 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function register(usernameInput, passwordInput) {
+    try {
+      const data = await apiRequest('/auth/register', {
+        method: 'POST',
+        token: '',
+        body: JSON.stringify({
+          username: String(usernameInput || '').trim(),
+          password: String(passwordInput || ''),
+        }),
+      })
+
+      session.value = {
+        loggedIn: true,
+        username: data.username,
+        token: data.token,
+      }
+      await loadUserWorkspace({ force: true, token: data.token })
+
+      return { ok: true }
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : '注册失败',
+      }
+    }
+  }
+
   async function restoreSession() {
     if (!session.value?.token) return false
     try {
-      const data = await request('/auth/me', {
+      const data = await apiRequest('/auth/me', {
         headers: {
           Authorization: `Bearer ${session.value.token}`,
         },
@@ -69,6 +82,7 @@ export const useAuthStore = defineStore('auth', () => {
         username: data.username || '',
         token: session.value.token,
       }
+      await loadUserWorkspace({ force: true, token: session.value.token })
       return true
     } catch {
       session.value = {
@@ -76,6 +90,7 @@ export const useAuthStore = defineStore('auth', () => {
         username: '',
         token: '',
       }
+      clearWorkspaceLoadState()
       return false
     }
   }
@@ -84,19 +99,22 @@ export const useAuthStore = defineStore('auth', () => {
     const token = session.value?.token
     try {
       if (token) {
-        await request('/auth/logout', {
+        await apiRequest('/auth/logout', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
           },
         })
       }
+    } catch (error) {
+      console.warn('Logout request failed; clearing local session anyway.', error)
     } finally {
       session.value = {
         loggedIn: false,
         username: '',
         token: '',
       }
+      clearWorkspaceLoadState()
     }
   }
 
@@ -106,6 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
     username,
     authToken,
     login,
+    register,
     logout,
     restoreSession,
   }

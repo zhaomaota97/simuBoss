@@ -12,3 +12,5 @@ ppt/*.pptx
 outputs/
 .env
 node_modules
+simuboss.db
+backend/simuboss.db

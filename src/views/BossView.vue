@@ -770,6 +770,7 @@ import {
 } from '../components/ui/dialog'
 import { DEFAULT_SYSTEM_PROMPTS } from '../config/prompts'
 import { runPlanScheduler } from '../runtime/scheduler'
+import { getApiBaseUrl } from '../services/api'
 import { executeRuntimeTask } from '../services/backendRuntime'
 import { useAssetLibraryStore } from '../stores/assetLibrary'
 import { useAuthStore } from '../stores/auth'
@@ -820,7 +821,7 @@ const DEFAULT_MANAGER_PLANNER = DEFAULT_SYSTEM_PROMPTS.managerPlanner
 const DEFAULT_MANAGER_SYNTHESIZER = DEFAULT_SYSTEM_PROMPTS.managerSynthesizer
 const DEFAULT_WORKER_PROMPT = DEFAULT_SYSTEM_PROMPTS.worker
 const sessionExpiredMessage = '登录已失效，请重新登录。'
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+const apiBaseUrl = getApiBaseUrl()
 
 const store = useSimuBossStore()
 const authStore = useAuthStore()

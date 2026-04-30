@@ -1,0 +1,14 @@
+node_modules
+dist
+logs
+outputs
+backend/.venv
+backend/generated_ppt
+backend/logs
+backend/**/*.pyc
+backend/**/__pycache__
+.git
+.github
+.env
+backend/.env
+*.egg-info

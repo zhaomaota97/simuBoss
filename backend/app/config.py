@@ -30,6 +30,7 @@ class Settings(BaseSettings):
         default="https://api.deepseek.com",
         validation_alias=AliasChoices("SIMUBOSS_DEEPSEEK_BASE_URL", "VITE_DEEPSEEK_BASE_URL"),
     )
+    database_url: str = ""
 
 
 @lru_cache

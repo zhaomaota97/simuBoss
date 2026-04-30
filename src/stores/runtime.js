@@ -1,6 +1,8 @@
 import { computed, ref } from 'vue'
+import { watch } from 'vue'
 import { defineStore } from 'pinia'
 import { streamChatCompletion } from '../services/llm'
+import { createDebouncedWorkspaceSaver } from '../services/api'
 
 export const useRuntimeStore = defineStore('runtime', () => {
   const approvals = ref([])
@@ -13,6 +15,45 @@ export const useRuntimeStore = defineStore('runtime', () => {
   const workerStates = ref({})
   const taskFlows = ref({})
   const workerLocks = new Map()
+  const persistenceReady = ref(false)
+
+  function serialize() {
+    return {
+      approvals: approvals.value,
+      deliveries: deliveries.value,
+      logs: logs.value,
+      teamQueues: teamQueues.value,
+      teamStatuses: teamStatuses.value,
+      workerStates: workerStates.value,
+      taskFlows: taskFlows.value,
+    }
+  }
+
+  function hydrate(data = {}) {
+    persistenceReady.value = false
+    approvals.value = Array.isArray(data.approvals) ? data.approvals : []
+    deliveries.value = Array.isArray(data.deliveries) ? data.deliveries : []
+    logs.value = Array.isArray(data.logs) && data.logs.length
+      ? data.logs
+      : [{ id: crypto.randomUUID(), role: 'sys', text: '系统启动完成，已同步数据库数据。' }]
+    teamQueues.value = data.teamQueues && typeof data.teamQueues === 'object' ? data.teamQueues : {}
+    teamStatuses.value = data.teamStatuses && typeof data.teamStatuses === 'object' ? data.teamStatuses : {}
+    workerStates.value = data.workerStates && typeof data.workerStates === 'object' ? data.workerStates : {}
+    taskFlows.value = data.taskFlows && typeof data.taskFlows === 'object' ? data.taskFlows : {}
+    window.setTimeout(() => {
+      persistenceReady.value = true
+    }, 0)
+  }
+
+  const scheduleSave = createDebouncedWorkspaceSaver('runtime', serialize)
+
+  watch(
+    [approvals, deliveries, logs, teamQueues, teamStatuses, workerStates, taskFlows],
+    () => {
+      if (persistenceReady.value) scheduleSave()
+    },
+    { deep: true },
+  )
 
   const approvalCount = computed(() => approvals.value.length)
 
@@ -271,6 +312,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     teamStatuses.value = {}
     workerStates.value = {}
     taskFlows.value = {}
+    if (persistenceReady.value) scheduleSave()
   }
 
   return {
@@ -281,6 +323,8 @@ export const useRuntimeStore = defineStore('runtime', () => {
     teamStatuses,
     workerStates,
     taskFlows,
+    serialize,
+    hydrate,
     approvalCount,
     log,
     ensureTeamQueue,

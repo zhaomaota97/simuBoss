@@ -124,6 +124,5 @@ function resetSandbox() {
   runtimeStore.clearRuntime()
   assetLibraryStore.resetAssets()
   router.replace('/')
-  window.location.reload()
 }
 </script>
